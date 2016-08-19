@@ -78,18 +78,12 @@ test_quick_sort_points()
 def split_points(x_sorted,y_sorted):
     
     n = len(y_sorted)
-    print "length of y is:",n
-    print "x_sorted:",x_sorted.shape
-    print "y_sorted:",y_sorted.shape
-
     
     split_index = n/2
     while (x_sorted[split_index,0] == x_sorted[split_index+1,0] and split_index <= n):
         split_index += 1
-    print "split index: ",split_index
     
     q_x = x_sorted[0:split_index + 1]
-    print "shape of q_x: ",q_x.shape
     r_x = x_sorted[split_index + 1:n]
     
     q_y = np.zeros(q_x.shape)
@@ -215,12 +209,13 @@ def find_closest_pair(points,points_sorted = []):
         print "Split pair is chosen"
     
     return closest_pair,min_dist
-    
+
+"""    
 points = [[0,5.5],[-1,20.6],[-5,100],[-60,35],[-1,20],[0,7],[10,10]]
 points = np.array(points)
 
 print find_closest_pair(points)
-
+"""
 
 
     

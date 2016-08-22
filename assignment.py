@@ -6,7 +6,7 @@ with open("assignment.txt","r") as f:
     
 from merge_sort_count_inv import merge_sort_count_inv
 
-A,inv = merge_sort_count_inv(array)
+quick_sort(array)
 
 print inv
 

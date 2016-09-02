@@ -126,6 +126,8 @@ def dist(point1,point2):
 def closest_pair_brute(points):
     
     n = len(points)
+    if n < 2:
+        return None,float("inf")
     
     closest_pair = [points[0],points[1]]
     min_dist = dist(points[0],points[1])
@@ -142,7 +144,8 @@ def find_closest_split_pair(x_sorted,y_sorted,delta):
     
     n = len(y_sorted)
     
-    filter_point = [point for point in y_sorted if point[0] > x_sorted[-1,0] - delta and point[0] < x_sorted[-1,0] + delta]
+    filter_point = [point for point in y_sorted \
+        if point[0] > x_sorted[-1,0] - delta and point[0] < x_sorted[-1,0] + delta]
     
     if len(filter_point) < 2:
         return None, float("inf")
@@ -163,6 +166,10 @@ def find_closest_split_pair(x_sorted,y_sorted,delta):
 
 def find_closest_pair(points,points_sorted = []):
     
+    if type(points) != type(np.array([0])):
+        print "Input is not numpy array"
+        return 
+        
     n = len(points)
     
     if n <= 1:
@@ -212,9 +219,11 @@ def find_closest_pair(points,points_sorted = []):
     
     return closest_pair,min_dist
    
-#points = [[0,5.5],[-1,20.6],[-5,100],[-60,35],[-1,15],[0,7],[10,10],[0,0]]
-points = [[0,0]]
+points = [[0,5.5],[-1,20.6],[-5,100],[-60,35],[-1,15],[0,70.1],[10,10],[0,0],[-10,15]]
+#points = [[0,0],[1,1],[1,1.5],[1,1.3]]
+#point = []
 points = np.array(points)
+print type(points)
 
 print find_closest_pair(points)
 print closest_pair_brute(points)

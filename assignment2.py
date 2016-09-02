@@ -1,3 +1,5 @@
+from random import randint
+
 def median(points):
     for point1 in points:
         for point2 in points:
@@ -12,7 +14,7 @@ def swap(array,i1,i2):
     array[i2] = swap
     
 def partition(array,l,r):
-    q = l+1 # in case p == l, i.e. the pivot in the first element of array
+    q = l+1
     for j in range(l+1,r):
         if array[j] < array[l]:
             swap(array,q,j)
@@ -31,11 +33,15 @@ def quick_sort(array,l = 0,r = None):
     
     #p = l # case 1
     #p = r-1 # case 2
-    # case 3
-    if r-l >= 3:
+    #case 3 median of three points 
+    '''if r-l >= 3:
         p = median({l:array[l],(r-1)-(r-l)/2:array[(r-1)-(r-l)/2],r-1:array[r-1]})
     else:
-        p = l
+        p = l'''
+    p = randint(l,r-1)
+    
+    
+    
     # partition the array and return the index of pivot element 
     swap(array,p,l)
     q = partition(array,l,r)
@@ -52,7 +58,12 @@ with open("assignment2.txt","r") as f:
     f.closed
 
 comparisons = 0
+comp_array = []
 
-quick_sort(array)
+for i in range(20):
+    copy = [element for element in array]
+    quick_sort(copy)
+    comp_array.append(comparisons)
+    comparisons = 0
 
-print comparisons
+print sum(comp_array)/len(comp_array)

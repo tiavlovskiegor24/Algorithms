@@ -17,14 +17,12 @@ def find_cc(graph):
     for vertex in graph['vertices']:
         if graph['vertices'][vertex]["label"] == None:
             cc[vertex] = BFS(graph,vertex)
-    
     return cc
     
 
 def create_adj_lists(neighbours):
     edges = {}
     vertices = {}
-    graph = {}
     
     for neighbour in neighbours:
         vertices[neighbour] = {"edges":[],"label":None}
@@ -36,25 +34,24 @@ def create_adj_lists(neighbours):
             vertices[vertex]["edges"].append("e" + str(edge)) 
             vertices[neighbour]["edges"].append("e" + str(edge)) # only for the undirected graphs
             neighbours[neighbour] = [remains for remains in neighbours[neighbour] if remains != vertex]
-            edge += 1
+            edge += 1 
     
-    graph["vertices"] = vertices
-    graph["edges"] = edges    
-    
-    return graph
+    return {"vertices":vertices,"edges":edges}
     
     
 
 def shortes_path(graph,s,v):
     
-    reset_labels(graph)
-    BFS(graph,s)
+    BFS(graph,s,reset_labs = True)
     
     return abs(graph["vertices"][v]['label'] - graph["vertices"][s]['label']) 
 
 
 # make sure to reset the labels of vertices to None before calling BFS
-def BFS(graph,source = "1"):
+def BFS(graph,source = "1",reset_labs = False):
+    
+    if reset_labs:
+        reset_labels(graph)
     
     n = len(graph['vertices'])
     m = len(graph['edges'])
@@ -74,6 +71,7 @@ def BFS(graph,source = "1"):
                 found_vertices.append(neighbour)
                 graph['vertices'][neighbour]["label"] = graph['vertices'][v]["label"] + 1
                 Q.append(neighbour)
+    
     return found_vertices
                 
 def read_vertices(filename):

@@ -33,16 +33,19 @@ def read_graph(filename):
             if not (line[0] in vertices):
                 vertices[line[0]] = []    
             vertices[line[0]].append(line[1])
+            
+            if not (line[1] in vertices):
+                vertices[line[1]] = []
+            
             edge += 1
         f.closed
     
     return {"vertices":vertices,"edges":edges}
-    
+#graph = read_graph("assignment4.txt")    
 
 
 neighbours3 = {'1':['2','3',"6"],'2':['4',"7"],'3':['4',"8"],"4":['5'],'5':[],'6':['5',"8"],'7':['4'],"8":['5']} 
 
-#graph = read_graph("assignment4.txt")
 graph = create_adj_lists(neighbours3.copy(),directed = True)
 
 print graph["vertices"]['1']

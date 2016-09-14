@@ -114,6 +114,10 @@ class Heap(object):
         self.array[index] = self.array.pop()
         self.bubble_up(index)
         self.bubble_down(index)
+
+def reset_labels(graph,reset_value = "Unexplored"):
+    for vertex in graph['vertices']:
+        graph['vertices'][vertex]['label'] = reset_value
              
 def read_graph(filename):
     
@@ -127,7 +131,7 @@ def read_graph(filename):
             line  = line.split()
             vertex = line[0]
             neighbours[vertex] = line[1:]
-            vertices[vertex] = []
+            vertices[vertex] = {"edges":[],"label":None}
             
         f.closed
     
@@ -136,14 +140,16 @@ def read_graph(filename):
         for neighbour in neighbours[vertex]:
             neighbour = neighbour.split(",")
             edges["e" + str(edge)] = {"vertices":[vertex,neighbour[0]],"weight":neighbour[1]}
-            vertices[vertex].append("e" + str(edge)) 
-            vertices[neighbour[0]].append("e" + str(edge))
+            vertices[vertex]["edges"].append("e" + str(edge)) 
+            vertices[neighbour[0]]["edges"].append("e" + str(edge))
             neighbours[neighbour[0]] = [remains for remains in neighbours[neighbour[0]] if remains[0] != vertex]
             edge += 1
     
     return {"vertices":vertices,"edges":edges}  
     
 def dijkstra_shortest_path(graph,source):
+    
+    reset_labels(graph,"Unexplored")
     
     shortest_paths = {}
     explored_vertices = {"absorbed":{},"not_absorbed":{}}
@@ -154,6 +160,7 @@ def dijkstra_shortest_path(graph,source):
     
     shortest_paths[source] = 0
     explored_vertices["absorbed"][source] = 0
+    graph['vertices'][source]["label"] = "absorbed"
     
     update_heap(graph,heap,explored_vertices,source,0)
     
@@ -165,24 +172,26 @@ def dijkstra_shortest_path(graph,source):
         explored_vertices["absorbed"][abs_vertex] = smallest_score
         del explored_vertices["not_absorbed"][abs_vertex]
         
+        graph['vertices'][abs_vertex]["label"] = "absorbed"
+        
         update_heap(graph,heap,explored_vertices,abs_vertex,smallest_score)
 
     return shortest_paths
     
 
 def update_heap(graph,heap,explored_vertices,abs_vertex,abs_vertex_score):  
-    for edge in graph['vertices'][abs_vertex]:
+    for edge in graph['vertices'][abs_vertex]["edges"]:
         
         neighbour = [neighbour for neighbour in graph["edges"][edge]["vertices"] if neighbour != abs_vertex][0]
         score = abs_vertex_score + float(graph["edges"][edge]["weight"])
-
-        if neighbour in explored_vertices["absorbed"]:
+        
+        if graph['vertices'][neighbour]["label"] == "absorbed":
             continue
-            
-        if neighbour in explored_vertices["not_absorbed"]:
+        
+        elif graph['vertices'][neighbour]["label"] == "not_absorbed":
             
             previous_score = explored_vertices["not_absorbed"][neighbour]
-            
+                
             if score < previous_score:
                 heap.delete(heap.indices[neighbour])
                 heap.insert(score,neighbour)
@@ -191,6 +200,7 @@ def update_heap(graph,heap,explored_vertices,abs_vertex,abs_vertex_score):
             
             heap.insert(score,neighbour)
             explored_vertices["not_absorbed"][neighbour] = float(score)
+            graph['vertices'][neighbour]["label"] = "not_absorbed"
                 
         
 
@@ -204,6 +214,9 @@ output = []
 for item in sample:
     output.append(int(shortest_paths[str(item)]))
 print output
+
+if output == [2599, 2610, 2947, 2052, 2367, 2399, 2029, 2442, 2505, 3068]:
+    print "Algorithm works"
     
 
 test = Heap()

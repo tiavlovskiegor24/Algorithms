@@ -1,8 +1,8 @@
 class Heap_element(object):
     
-    def __init__(self,key,id):
+    def __init__(self,(key,value)):
         self.key = key
-        self.id = id
+        self.value = value
         self.index = None
 
 class Heap(object):
@@ -14,15 +14,15 @@ class Heap(object):
         
     def print_array(self):
         for element in self.array:
-            print (element.key,element.id)
+            print (element.key,element.value)
     
-    def insert(self,key,id):
+    def insert(self,key,value):
         
         if self.mode == 'min':
-            new_element = Heap_element(float(key),id)
+            new_element = Heap_element((float(key),value))
             self.array.append(new_element)
         elif self.mode == 'max':
-            new_element = Heap_element(-float(key),id)
+            new_element = Heap_element((-float(key),value))
             self.array.append(new_element)
             
         return self.bubble_up(len(self.array)-1) 
@@ -33,7 +33,7 @@ class Heap(object):
             self.swap(index,int(index/2))
             return self.bubble_up(int(index/2))
         else:
-            self.indices[self.array[index].id] = index
+            self.indices[self.array[index].value] = index
             self.array[index].index = index
             return index
             
@@ -56,7 +56,7 @@ class Heap(object):
                 self.swap(index,index*2+1)
                 return self.bubble_down(index*2+1)
             else:
-                self.indices[self.array[index].id] = index
+                self.indices[self.array[index].value] = index
                 self.array[index].index = index
                 return index
         else:
@@ -64,7 +64,7 @@ class Heap(object):
                 self.swap(index,index*2)
                 return self.bubble_down(index*2)
             else:
-                self.indices[self.array[index].id] = index
+                self.indices[self.array[index].value] = index
                 self.array[index].index = index
                 return index
                 
@@ -75,9 +75,9 @@ class Heap(object):
         self.array[index1] = self.array[index2]  
         self.array[index2] = s
         
-        self.indices[self.array[index1].id] = index1
+        self.indices[self.array[index1].value] = index1
         self.array[index1].index = index1
-        self.indices[self.array[index2].id] = index2
+        self.indices[self.array[index2].value] = index2
         self.array[index1].index = index1
     
     def extract(self):
@@ -87,17 +87,17 @@ class Heap(object):
             
         if len(self.array) == 1:
             element = self.array.pop()
-            del self.indices[element.id]
+            del self.indices[element.value]
         else:
             element = self.array[0]
-            del self.indices[element.id]
+            del self.indices[element.value]
             self.array[0] = self.array.pop()
             self.bubble_down(0)
         
         if self.mode == 'min':
-            return element.key,element.id
+            return (element.key,element.value)
         elif self.mode == 'max':
-            return -element.key,element.id
+            return (-element.key,element.value)
         
     def delete(self,index):
         if index > len(self.array)-1 or index < 0:
@@ -106,11 +106,11 @@ class Heap(object):
             
         if index == len(self.array)-1:
              element = self.array.pop()
-             del self.indices[element.id]
+             del self.indices[element.value]
              return 
         
         element = self.array[index]
-        del self.indices[element.id]
+        del self.indices[element.value]
         self.array[index] = self.array.pop()
         self.bubble_up(index)
         self.bubble_down(index)

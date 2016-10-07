@@ -30,7 +30,3 @@ def quick_sort(array,l = 0,r = None):
     
     quick_sort(array,l,q-1)
     quick_sort(array,q,r) 
-
-array = [10,0,5]
-quick_sort(array)
-print array

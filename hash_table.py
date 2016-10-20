@@ -6,7 +6,7 @@ class Hash_table(object):
     def __init__(self,n = 1000003):
         self.array = []
         self.n = n
-        self.n_param = 2
+        self.n_param = 4
         self.param = tuple(randint(0,self.n-1) for i in range(self.n_param))
         
         for i in range(self.n):
@@ -33,7 +33,8 @@ class Hash_table(object):
         
         index = self.hash_func(key)
         
-        if key in [element for element in self.array[index] if element == key]:
+        #if key in [element for element in self.array[index] if element == key]:
+        if key in self.array[index]:
             return key
         else:
             return False

@@ -49,9 +49,10 @@ def index_gen(n_mutations,start,finish):
         yield "Total_End"
         return
     
-    if n_mutations > 1:
-        for i in range(start,finish-n_mutations+1):
-            
+    elif n_mutations > 1:
+        i = start
+        while i < finish-n_mutations+1:
+        #for i in range(start,finish-n_mutations+1):
             yield i
             
             for j in index_gen(n_mutations-1,i+1,finish):
@@ -72,9 +73,12 @@ def index_gen(n_mutations,start,finish):
                 
                 else:
                     yield j
-         
+            i += 1
+            
     else:
-        for i in range(start,finish):
+        i = start
+        while i < finish:
+        #for i in range(start,finish):
             yield i
             
             if i == finish - 1:
@@ -82,7 +86,7 @@ def index_gen(n_mutations,start,finish):
                 return
             
             yield "End"
-            
+            i += 1
 
 def mutate_gen(node,n_mutations,start = 0):
         n = len(node)
@@ -101,7 +105,7 @@ def mutate_gen(node,n_mutations,start = 0):
                 mutant = mutant[:j] + mutation + mutant[j+1:]
             yield mutant
 
-n_mutations = 7    
+n_mutations = 1    
 t1 = time()    
 mutants = mutate_gen("0101001110100",n_mutations)
 #t2 = time()

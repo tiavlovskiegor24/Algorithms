@@ -12,6 +12,7 @@ class Quick_Sort(object):
         array[i1] = array[i2]
         array[i2] = swap
 
+    
     def partition(self,array,l,r):
         q = l+1 # in case p == l, i.e. the pivot in the first element of array
         for j in range(l+1,r):
@@ -23,6 +24,7 @@ class Quick_Sort(object):
         self.swap(array,l,q-1)
         return q
 
+    
     def quick_sort(self,array,l = 0,r = None):
         
         if r == None:

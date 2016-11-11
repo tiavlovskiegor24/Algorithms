@@ -219,14 +219,14 @@ def find_closest_pair(points,points_sorted = []):
     
     return closest_pair,min_dist
    
-points = [[0,5.5],[-1,20.6],[-5,100],[-60,35],[-1,15],[0,70.1],[10,10],[0,0],[-10,15]]
+#points = [[0,5.5],[-1,20.6],[-5,100],[-60,35],[-1,15],[0,70.1],[10,10],[0,0],[-10,15]]
 #points = [[0,0],[1,1],[1,1.5],[1,1.3]]
 #point = []
-points = np.array(points)
-print type(points)
+#points = np.array(points)
+#print type(points)
 
-print find_closest_pair(points)
-print closest_pair_brute(points)
+#print find_closest_pair(points)
+#print closest_pair_brute(points)
 
 
 

@@ -1,6 +1,6 @@
 from collections import deque
 
-
+#hello
 def reset_labels(graph,reset_value = None):
     for vertex in graph['vertices']:
          graph['vertices'][vertex]['label'] = reset_value
@@ -48,6 +48,7 @@ def shortes_path(graph,s,v):
 
 
 # make sure to reset the labels of vertices to None before calling BFS
+#buy
 def BFS(graph,source = "1",reset_labs = False):
     
     if reset_labs:

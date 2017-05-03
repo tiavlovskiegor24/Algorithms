@@ -65,12 +65,7 @@ Thumbs.db
 *#
 
 # folders #
-mongodb_dump/
-scripts/dump/
-Research/
-scripts/.ipynb_checkpoints/
-AWS/
-scripts/data/
+*/.ipynb_checkpoints/
 */data/
 */models/
 */notebooks/

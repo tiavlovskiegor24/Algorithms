@@ -99,6 +99,30 @@ def const_probs(ensemble,terminate):
             
             continue
 
+def cum_probs_rounded(ensemble = None,precision = 16):
+    if ensemble is None:
+        return
+    Q = {}
+    R = {}
+    symbols,counts = zip(*ensemble)
+    total_counts = sum(counts)
+    del counts
+    #Q = namedtuple("Lower_cum_probs",symbols)
+    #R = namedtuple("Upper_cum_probs",symbols)
+    cum_prob = 0
+    # dict implementation
+    for symbol,prob in ensemble:
+        Q[symbol] = cum_prob
+        #setattr(Q,symbol,cum_prob)
+        cum_prob += prob
+        R[symbol] = cum_prob
+        #setattr(R,symbol,cum_prob)
+
+    Q = namedtuple("Lower_cum_probs",symbols)(**Q)
+    R = namedtuple("Lower_cum_probs",symbols)(**R)
+    return Q,R,total_counts
+
+        
 def cum_probs(ensemble = None):
     if ensemble is None:
         return
@@ -185,6 +209,23 @@ def binary_generator(num_den,scale=1):
             
         scale += 1
 '''
+def binary_discretizer(frac,precision = 16):
+    frac = frac
+    for i in range(precision):
+
+        if 2*frac.numerator >= frac.denominator:
+            digit = "1"
+        else:
+            digit = "0"
+            
+        stop = yield digit
+        if stop == "stop":
+            yield frac,scale
+            break
+        
+        frac = 2*frac-int(digit)
+
+
 def binary_generator(frac,scale=1):
     frac = frac
     scale = scale
@@ -205,7 +246,7 @@ def binary_generator(frac,scale=1):
         
         scale += 1
 
-class arithmetic_codes(object):
+class Arithmetic_Codes(object):
     def __init__(self,model_class,ensemble,terminate):
 
         self.t_symbol,t_prob = terminate

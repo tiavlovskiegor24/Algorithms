@@ -52,7 +52,8 @@ class ViterbiDecoder:
     # Consider using lab5.hamming(seq1,seq2) which computes the
     # Hamming distance between two binary sequences.
     def branch_metric(self,expected,received):
-        pass  # your code here...
+        dig_received = map(lambda x: int(x > 0.5),received)
+        return lab5.hamming(expected,dig_received)
 
     # compute self.PM[...,n] from the batch of r parity bits and
     # the path metrics for self.PM[...,n-1] computed on the previous
@@ -65,8 +66,21 @@ class ViterbiDecoder:
     #    self.expected_parity
     #    self.branch_metric()
     def viterbi_step(self,n,received_voltages):
-        pass  # your code here...
-
+        
+        for s,predecessor_states in enumerate(self.predecessor_states):
+            expected_parities = [self.expected_parity[s_pred][s] for s_pred in predecessor_states]
+            branch_metrics = map(lambda x: self.branch_metric(x,received_voltages),expected_parities)
+            path_metrics = [self.PM[s_pred,n-1] + branch_metric for s_pred,branch_metric in
+                            zip(predecessor_states,branch_metrics)]
+            min_path_metric,min_predecessor_state = min(zip(path_metrics,predecessor_states),key = lambda x:x[0])
+            
+            self.PM[s,n] = min_path_metric
+            
+            
+            self.Predecessor[s,n] = min_predecessor_state
+            
+            
+            
     # Identify the most-likely ending state of the encoder by
     # finding the state s which has the mimimum value of PM[s,n]
     # where n points to the last column of the trellis.  If there
@@ -75,7 +89,12 @@ class ViterbiDecoder:
     # and repeat the search. Keep doing this until a unique s is
     # found.  Return the tuple (s,n).
     def most_likely_state(self,n):
-        pass  # your code here...
+        while n >= 0:
+            sorted_states = numpy.argsort(self.PM[:,n])
+            if self.PM[sorted_states[0],n] >= self.PM[sorted_states[1],n]:
+                n -= 1
+            else:
+                return (sorted_states[0],n)
 
     # starting at state s at time n, use the Predecessor
     # array to find all the states on the most-likely

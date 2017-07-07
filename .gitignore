@@ -69,6 +69,8 @@ Thumbs.db
 */data/
 */models/
 */notebooks/
+data/
+images/
 
 # html #
 *.html

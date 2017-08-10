@@ -1,6 +1,5 @@
 from collections import namedtuple,OrderedDict
 from math import log
-from fractions import gcd,Fraction
 
 def Laplace_probs(ensemble,terminate):
     symbols,_ = zip(*ensemble)
@@ -91,20 +90,14 @@ def cum_intervals(ensemble = None,u = 0,r = None,precision = 16):
     total_count = sum(counts)
     
     del counts
-    #Q = namedtuple("Lower_cum_probs",symbols)
-    #R = namedtuple("Upper_cum_probs",symbols)
     cum_count = 0
     prev = 0
-    # dict implementation
+
     for symbol,count in ensemble:
-        #Q[symbol] = prev#binary(Fraction(cum_count,total_count))
-        #setattr(Q,symbol,cum_prob)
         cum_count += count
         assert cum_count * r <= total_count * 2**(precision)
         R[symbol] = prev = cum_count*r/total_count
-        #R[symbol] = prev = binary(Fraction(cum_count * r,total_count * 2**(precision)),precision = precision)
-        
-        #setattr(R,symbol,cum_prob)    
+
     assert R.values()[-1] <= r
     for i,s in enumerate(R.keys()):
         Q[s] = (R.values()[i-1] if i > 0 else u)
@@ -124,7 +117,6 @@ def binary(frac,precision = 16):
             d = 0
 
         b =  (b << 1) + d
-        #stop = yield digit
         
         frac = 2*frac-int(d)
 
@@ -175,7 +167,6 @@ class Arithmetic_Codes(object):
                 break
                     
             yield s
-            #print s,
     
             u = Q[s]
             v = R[s]
@@ -257,11 +248,7 @@ class Arithmetic_Codes(object):
                 r = v-u
                 s += 1
 
-            if c == "terminate":
-                #for x in self.terminate_code(u,v):
-                 #   yield x
-                #break
-            
+            if c == "terminate":            
                 if u <= quarter:
                     yield "0"
                     for _ in range(s+1):
@@ -294,36 +281,3 @@ if __name__ == "__main__":
     print len(code)
     assert mes == "".join(d_mes)
     
-    
-        
-    
-'''
-if __name__ == "__main__":
-    symbols = ["a","b"]
-    probs = [0.1,0.9]
-    terminate = ("#",.1)
-    #model = const_probs(zip(symbols[:],probs),terminate)
-    #model.send(None)
-    #print model.send("a")
-    #L_model = Laplace_probs(symbols[:],terminate)
-    #print L_model.send(None)
-    #print L_model.send("a")
-    #mes = "abababbbbaaabbbbbbbbbbbababbbbbabbabaababbabbbbabbabbabbbbaabbbbabbabbbbbbabbbabbabbabbbbbbbbbbbbababbbbabbabbbababba#"
-    #mes = "bbbbbbbbbbbabbbbbbbbcbbabbabbbbcbbbbbbbbbabbbabbbbbabbbbbbbbbbbbbbbabbbbbbbbbbbabbbbbbbabbbbbbbbbbabbbbbbbabbbbabbbbabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbcbbbbbbbbabbbbbbabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabbbbbbcbbbbbbabbbbbbbbbbbbbabbbbbbbbbbbbbbbbbbabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabbbbbbcbbbbbb#"
-
-    #print mul_fractions((3,5),(12,89))
-    
-    mes = "aabaabbabbbbabbbabbabbbbbabbabbabbbabbaaabba#"
-    mes  = 20*"aaaaaaaaaaaaabaaaaaaaaaaaaaabaaaaaaabaaaaaaaaabaaaaaaaaaaaaaababaaaaaaaaaaaaaaaaaaaaaaaaaabbaaaaaaab"+"#"
-    print len(mes)
-    print mes
-    ac = Arithmetic_Codes(Laplace_probs,zip(symbols,probs),terminate)
-    #cc = arithmetic_codes(const_probs,zip(symbols,probs),terminate)
-    code = ac.encode(mes)
-    print len(code)
-    print code
-    #m = ac.decode(code)
-    #print "\n",m
-    
-    #print m == mes
-'''

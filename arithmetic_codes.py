@@ -1,4 +1,4 @@
-from collections import namedtuple
+from collections import namedtuple,OrderedDict
 from math import log
 from fractions import gcd,Fraction
 
@@ -57,29 +57,6 @@ def Laplace_probs(ensemble,terminate):
         probs.append(t_prob)
         t_count = max(1,total_counts/9+1)
         
-
-def add_fractions(frac1,frac2):
-    num = frac1[0]*frac2[1]+frac1[1]*frac2[0]
-    if num == 0:
-        den = 1
-    else:
-        den = frac1[1]*frac2[1]
-    divisor = gcd(num,den)
-    
-    return num/divisor,den/divisor
-
-def mul_fractions(frac1,frac2):
-    num = frac1[0]*frac2[0]
-    if num == 0:
-        den = 1
-    else:
-        den = frac1[1]*frac2[1]
-    divisor = gcd(num,den)
-    return num/divisor,den/divisor
-
-def compl_fraction(frac):
-    return frac[1]-frac[0],frac[1]
-
 def const_probs(ensemble,terminate):
     if ensemble is None:
         return 
@@ -99,152 +76,59 @@ def const_probs(ensemble,terminate):
             
             continue
 
-def cum_probs_rounded(ensemble = None,precision = 16):
+def cum_intervals(ensemble = None,u = 0,r = None,precision = 16):
+    if r is None:
+        r = 2 ** (precision)
+
+    assert u+r <= 2**precision
+    whole = 2**precision
+    
     if ensemble is None:
         return
-    Q = {}
-    R = {}
+    Q = OrderedDict()
+    R = OrderedDict()
     symbols,counts = zip(*ensemble)
-    total_counts = sum(counts)
+    total_count = sum(counts)
+    
     del counts
     #Q = namedtuple("Lower_cum_probs",symbols)
     #R = namedtuple("Upper_cum_probs",symbols)
-    cum_prob = 0
+    cum_count = 0
+    prev = 0
     # dict implementation
-    for symbol,prob in ensemble:
-        Q[symbol] = cum_prob
+    for symbol,count in ensemble:
+        #Q[symbol] = prev#binary(Fraction(cum_count,total_count))
         #setattr(Q,symbol,cum_prob)
-        cum_prob += prob
-        R[symbol] = cum_prob
-        #setattr(R,symbol,cum_prob)
-
-    Q = namedtuple("Lower_cum_probs",symbols)(**Q)
-    R = namedtuple("Lower_cum_probs",symbols)(**R)
-    return Q,R,total_counts
+        cum_count += count
+        assert cum_count * r <= total_count * 2**(precision)
+        R[symbol] = prev = cum_count*r/total_count
+        #R[symbol] = prev = binary(Fraction(cum_count * r,total_count * 2**(precision)),precision = precision)
+        
+        #setattr(R,symbol,cum_prob)    
+    assert R.values()[-1] <= r
+    for i,s in enumerate(R.keys()):
+        Q[s] = (R.values()[i-1] if i > 0 else u)
+        R[s] = max(Q[s]+1,R[s] + u)
+        
+    return Q,R
 
         
-def cum_probs(ensemble = None):
-    if ensemble is None:
-        return
-    Q = {}
-    R = {}
-    symbols,counts = zip(*ensemble)
-    total_counts = sum(counts)
-    del counts
-    #Q = namedtuple("Lower_cum_probs",symbols)
-    #R = namedtuple("Upper_cum_probs",symbols)
-    cum_prob = 0
-    # dict implementation
-    for symbol,prob in ensemble:
-        Q[symbol] = cum_prob
-        #setattr(Q,symbol,cum_prob)
-        cum_prob += prob
-        R[symbol] = cum_prob
-        #setattr(R,symbol,cum_prob)
-
-    Q = namedtuple("Lower_cum_probs",symbols)(**Q)
-    R = namedtuple("Lower_cum_probs",symbols)(**R)
-    return Q,R,total_counts
-    '''
-    list implemetations
-    if Q:
-        Q.append(prob+Q[-1])
-
-    else:
-        Q.append(prob)
-
-    R.append(1-Q[-1])
-
-    return zip(symbols,Q),zip(symbols,R)
-    '''
-'''
-def binary_generator(x):
-    remainder = x
-    scale = -1
-    while True:
-        digit,quotient = divmod(remainder,2**scale)
-        if digit < 1:
-            scale -= 1
-            yield "0"
-        else:
-            yield "1"
-            remainder = quotient
-            scale -= 1
-
-def binary_generator(num_den,scale=1):
-    num,den = num_den
-    remainder = x
-    scale = 1
-    while True:
-
-        if 2*num >= den:
-            digit = "1"
-        else:
-            digit = "0"
-            
-        terminate = yield digit
-        if terminate:
-            return scale,(num,den)
-        
-        num = (2*num) - (int(digit) * den)
-            
-        scale += 1
-
-def binary_generator(num_den,scale=1):
-    num,den = num_den
-    scale = scale
-    while True:
-
-        if 2*num >= den:
-            digit = "1"
-        else:
-            digit = "0"
-            
-        stop = yield digit,scale
-        if stop == "stop":
-            yield (num,den),scale
-            break
-        
-        num = (2*num) - (int(digit) * den)
-            
-        scale += 1
-'''
-def binary_discretizer(frac,precision = 16):
+def binary(frac,precision = 16):
     frac = frac
+    b = 0
     for i in range(precision):
 
         if 2*frac.numerator >= frac.denominator:
-            digit = "1"
+            d = 1
         else:
-            digit = "0"
-            
-        stop = yield digit
-        if stop == "stop":
-            yield frac,scale
-            break
-        
-        frac = 2*frac-int(digit)
+            d = 0
 
+        b =  (b << 1) + d
+        #stop = yield digit
+        
+        frac = 2*frac-int(d)
 
-def binary_generator(frac,scale=1):
-    frac = frac
-    scale = scale
-    while True:
-
-        if 2*frac.numerator >= frac.denominator:
-            digit = "1"
-        else:
-            digit = "0"
-            
-        stop = yield digit,scale
-        if stop == "stop":
-            yield frac,scale
-            break
-        
-        frac = 2*frac-int(digit)
-        
-        
-        scale += 1
+    return b
 
 class Arithmetic_Codes(object):
     def __init__(self,model_class,ensemble,terminate):
@@ -253,180 +137,167 @@ class Arithmetic_Codes(object):
 
         self.model = model_class(ensemble,\
                                  ("terminate",t_prob))
+
+        self.precision = 16
         
         
     def decode(self,code):
-        Q,R,total_counts = cum_probs(self.model.send(None))
-        n_symbols = len(Q)
-        message = ""
-        u = 0.
-        v = 1.
-        p = v - u
-        for i,d in enumerate(code):
-            
-            #update interval
-            u += p*0.5*int(d)
-            v -= p*0.5*(1-int(d))
-            p = v - u
-            # loop through the symbols
-            idx = 0
-            #for idx,symbol in enumerate(Q._fields):
-            while True:
-
-                symbol = Q._fields[idx % n_symbols]
-                if u < getattr(Q,symbol):
-                    break
-                
-                if v > getattr(R,symbol):
-                    idx += 1
-                    continue
-
-                if symbol == "terminate":
-                    #terminate decoding
-                    #print "Hello"
-                    return message+self.t_symbol
-
-                #update message 
-                message += symbol
-
+        precision = self.precision
+        whole = 2**precision
+        half = whole/2
+        quarter = whole/4
         
-                # rescale interval
-                u -= getattr(Q,symbol)
-                v -= getattr(Q,symbol)
+        z = 0
+        u = 0
+        v = whole
+        r = v-u
+        s = None
+        
+        #initialise z down to precision
+        pointer = 0
+        for i in range(min(precision,len(code))):
 
-                u /= (getattr(R,symbol) - getattr(Q,symbol))
-                v /= (getattr(R,symbol) - getattr(Q,symbol))
-                p = v - u
-                
-                Q,R,total_counts = cum_probs(self.model.send(symbol))
-                idx = 0
-        return message
+            z += int(code[pointer])*2**(precision-(i+1))
+            pointer += 1
 
-    def terminate_code(self,u,v,code):
-
-        half = Fraction(1,2)
         while True:
-            while True:
-                if u >= half:
-                    code += "1"
-                    u -= half
-                    v -= half
-                elif v <= half:
-                    code += "0"
-                else:
+            
+            Q,R = cum_intervals(self.model.send(s),u = u,r = r,precision = precision)
+
+            for s in Q:
+                if Q[s] <= z and R[s] > z:
                     break
-
-                u /= half
-                v /= half
-
-            if u == 0:
-                code += "0"
-                return code
-            elif v == 1:
-                code += "1"
-                return code
-            elif (half-u) >= (v-half):
-                v = half
             else:
-                u = half
+                break
+
+            if s == "terminate":
+                yield self.t_symbol
+                break
+                    
+            yield s
+            #print s,
+    
+            u = Q[s]
+            v = R[s]
+            r = v-u
+    
+            while v <= half:
+                u *= 2
+                v *= 2
+                r = v-u
+                z *= 2
+                if pointer < len(code):
+                    z += int(code[pointer])
+                    pointer += 1
+
+
+            while u >= half:
+                u = (u-half) * 2
+                v = (v-half) * 2
+                r = v - u
+                z = (z-half) * 2
+                if pointer < len(code):
+                    z += int(code[pointer])
+                    pointer += 1
+
+
+
+            while u >= quarter and v <= 3*quarter:
+                u = (u-quarter) * 2
+                v = (v-quarter) * 2
+                r = v - u
+                z = (z-quarter) * 2
+                if pointer < len(code):
+                    z += int(code[pointer])
+                    pointer += 1
                 
     def encode(self,message):
-        Q,R,total_counts = cum_probs(self.model.send(None))
-        code = ""
-        u = Fraction(0,1)
-        u_scale = 1
-        v = Fraction(1,1)
-        v_scale = 1
-        #p = v-u
+        precision = self.precision
+        whole = 2**precision
+        half = whole/2
+        quarter = whole/4
+        #code = ""
+        u = 0
+        v = whole
+        r = v-u
+        Q,R = cum_intervals(self.model.send(None),u = u,r = r,precision = precision)
         
-        for i,c in enumerate(message):
-
-            #print c
-
+        s = 0
+        for ind,c in enumerate(message):
             if c == self.t_symbol:
                 c = "terminate"
-
-            u_update = Fraction(getattr(Q,c),total_counts)
-            v_update = Fraction(getattr(R,c),total_counts)
-
-            #print u,v
-            #print u_update,v_update
             
-            
-            '''
-            u = add_fractions(mul_fractions(u,compl_fraction(u_update)),
-                             mul_fractions(v,u_update))
+            u = Q[c]
+            v = R[c]
+            r = v - u
 
-            v = add_fractions(mul_fractions(u,compl_fraction(v_update)),
-                             mul_fractions(v,v_update))
-            '''
-            u = u*(1-u_update) + v*u_update
-            v = u*(1-v_update) + v*v_update
+            while v <= half:
+                
+                yield "0"
+                for _ in range(s):
+                    yield "1"
+                s = 0
+                u *= 2
+                v *= 2
+                r = v-u
 
-            #u = u.numerator,u.denominator
-            #v = v.numerator,v.denominator
-            
+            while u >= half:
+                
+                yield "1"
+                for _ in range(s):
+                    yield "0"
+                s = 0
+                u = (u-half) * 2
+                v = (v-half) * 2
+                r = v-u
+
+            while u >= quarter and v <= half+quarter:
+                u = (u-quarter) * 2
+                v = (v-quarter) * 2
+                r = v-u
+                s += 1
 
             if c == "terminate":
-                #print u
-                #print v
-                code = self.terminate_code(u,v,code)
-
-                return code
-
-            #v = add_fractions(u,getattr(R,c))
-            #u = add_fractions(u,getattr(Q,c))
-            #v = getattr(R,c)
-            #u = getattr(Q,c)
-
-            #p = v-u
-            #print u,v
+                #for x in self.terminate_code(u,v):
+                 #   yield x
+                #break
             
-            b_gen_v = binary_generator(v,v_scale)
-            b_gen_u = binary_generator(u,u_scale)
+                if u <= quarter:
+                    yield "0"
+                    for _ in range(s+1):
+                        yield "1"
+                else:
+                    yield "1"
+                    for _ in range(s+1):
+                        yield "0"
+                break
             
-            while True:
-                v_b,scale_v = b_gen_v.next()
-                u_b,scale_u = b_gen_u.next()
+            Q,R = cum_intervals(self.model.send(c),u = u,r = r,precision = precision)
+            
 
-                assert scale_v == scale_u
-                #print v_b,u_b
+if __name__ == "__main__":
 
-                if v_b == "0":
-                    code += "0"
-                elif u_b == "1":
-                    code += "1"
-                    #u -= .5
-                    #v -= .5
-                else:
-                    #print "Hello"
-                    u,scale_u = b_gen_u.send("stop")
-                    v,scale_v = b_gen_v.send("stop")
-                    #u = Fraction(*u)
-                    #v = Fraction(*v)
-                    
-                    assert scale_v == scale_u,"interval scales do not match"
-                    Q,R,total_counts = cum_probs(self.model.send(c))
-                    break
+    symbols = ["a","b"]
+    probs = [0.1,0.9]
 
-                #print code
-                
-                '''
-                if v <= .5:
-                    code += "0"
-                elif u > .5:
-                    code += "1"
-                    u -= .5
-                    v -= .5
-                else:
-                    Q,R = cum_probs(self.model.send(c))
-                    break
-
-                u /= .5
-                v /= .5
-                p = v-u
-                '''
+    terminate = ("#",.1)
+    ac = Arithmetic_Codes(Laplace_probs,zip(symbols,probs),terminate)
+    mes = "aaaaaaaaaaaaaaaaaaaaaaaabaaaaaaabaaaaaaaabaaaaaaaabaaaaaaaaaaabaaabaaaaaaabaaaaaaabaaabbaaaaaaaaaaabaaabbababaaabbaaabaaaaaaabbbaaaaabbbaaaaaaaaaaaaabbabb"*1000+"#"
+    #mes = "b#"
+    code = list(ac.encode(mes))
+    ac = Arithmetic_Codes(Laplace_probs,zip(symbols,probs),terminate)
+    print "".join(code)
+    
+    d_mes = list(ac.decode(code))
+    print "\n","".join(d_mes)
+    print len(mes)
+    print len(code)
+    assert mes == "".join(d_mes)
+    
+    
         
+    
+'''
 if __name__ == "__main__":
     symbols = ["a","b"]
     probs = [0.1,0.9]
@@ -446,7 +317,7 @@ if __name__ == "__main__":
     mes  = 20*"aaaaaaaaaaaaabaaaaaaaaaaaaaabaaaaaaabaaaaaaaaabaaaaaaaaaaaaaababaaaaaaaaaaaaaaaaaaaaaaaaaabbaaaaaaab"+"#"
     print len(mes)
     print mes
-    ac = arithmetic_codes(Laplace_probs,zip(symbols,probs),terminate)
+    ac = Arithmetic_Codes(Laplace_probs,zip(symbols,probs),terminate)
     #cc = arithmetic_codes(const_probs,zip(symbols,probs),terminate)
     code = ac.encode(mes)
     print len(code)
@@ -455,3 +326,4 @@ if __name__ == "__main__":
     #print "\n",m
     
     #print m == mes
+'''

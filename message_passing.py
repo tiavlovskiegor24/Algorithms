@@ -1,15 +1,25 @@
 from collections import deque
 
 class Node(object):
-    def __init__(self,name,type_,connections):
+    def __init__(self,name = None,type_=None,connections = []):
         self.name = name
         self.type_ = type_
-        self.connections = connections
-        self.n_connections = len(self.connections)
-        self.received = {c:[] for c in self.connections}
-        self.to_send = {c:[] for c in self.connections}
-        self.sent = set()
+        self.received = {}
+        self.to_send = {}
+        for con_name in connections:
+            self.add_connection(con_name)
+        
+        
+    def n_connections(self):
+        return len(self.received)
 
+    def get_connections(self):
+        return self.received.keys()
+    
+    def add_connection(self,con_name):
+        self.received[con_name] = None
+        self.to_send[con_name] = []
+        
 
 
     def send(self,to_connection = None):
@@ -18,7 +28,7 @@ class Node(object):
         if to_connection is not None:
             to_list = [to_connection]
         else:
-            to_list = list(self.connections)
+            to_list = list(self.get_connections())
 
         for to_connection in to_list:
             
@@ -26,7 +36,7 @@ class Node(object):
              #   yield None
               #  continue
                 
-            if len(self.to_send[to_connection]) < self.n_connections-1:
+            if len(self.to_send[to_connection]) < self.n_connections()-1:
                 yield None
                 continue
 
@@ -39,10 +49,10 @@ class Node(object):
     def receive(self,message):
         to,from_,content = message
         assert to == self.name
-        assert from_ in self.connections
+        assert from_ in self.get_connections()
         self.received[from_] = content
 
-        for c in self.connections:
+        for c in self.get_connections():
             if c != from_:
                 self.to_send[c].append((from_,content))
 
@@ -54,8 +64,8 @@ class Node(object):
         
 class Factor(Node):
 
-    def __init__(self,factor_func,**kwargs):
-        super(Factor,self).__init__(type_ = "Factor",**kwargs)
+    def __init__(self,factor_func,*args,**kwargs):
+        super(Factor,self).__init__(type_ = "Factor",*args,**kwargs)
         self.compute = factor_func
 
     def __call__(self,**kwargs):
@@ -64,22 +74,27 @@ class Factor(Node):
     def message_func(self,to_variable,feed_dict):
 
         evaluations = {}
-        for variable,func in feed_dict:
-            for value in self.variables[variable]:
-                evaluations[(variable,value)] = func(v)
-        
-                            
-        remaining = set(self.variables.keys())-set([to_variable])
-        g = self.generate_combinations(self.variables,remaining)
+        variables = {}
+        for variable,(func,domain) in feed_dict.iteritems():
+            variables[variable] = domain
+            for value in domain:
+                evaluations[(variable,value)] = func(value)
+
+        remaining = set(variables.keys())
+        if variables:
+            g = self.generate_combinations(variables,remaining)
+        else:
+            g = [[]]
         
         def message(x,**kwargs):
             marginal = 0
             for instances_list in g:
                 feed_dict = dict([(to_variable,x)]+instances_list)
                 factor_value = self.compute(**feed_dict)
-                cum_prod = reduce(lambda cum,var_val: cum * evaluations[var_val],instances_list)
+                cum_prod = reduce(lambda cum,var_val: cum * evaluations[var_val],
+                                  instances_list,1)
                 marginal += factor_value*cum_prod
-
+            print marginal
             return marginal
 
         return message
@@ -92,7 +107,8 @@ class Factor(Node):
                 if len(remaining) == 1:
                     yield [(variable,value)]
                 else:
-                    g = generate_combinations(variables_dict,remaining - set([variable]))
+                    g = generate_combinations(variables_dict,
+                                              remaining - set([variable]))
                     for instances_list in g:
                         yield [(variable,value)]+instances_list
 
@@ -100,19 +116,29 @@ class Factor(Node):
                         
 class Variable(Node):
 
-    def __init__(self,**kwargs):
-        super(Variable,self).__init__(type_ = "Variable",**kwargs)
+    def __init__(self,domain,*args,**kwargs):
+        super(Variable,self).__init__(type_ = "Variable",*args,**kwargs)
+        self.domain = set(domain)
 
     def message_func(self,to_factor,feed_dict):
-        
         def message(x):
-            '''message from Variable {} to Factor {}'''.format(self.name,to_factor)
-            return reduce(lambda cum,f:cum*f(x),feed_dict.values())
+            return reduce(lambda cum,f:cum*f(x),feed_dict.values(),1)
 
-        return message
+        return (message,self.domain)
+
+    def compute_marginal(self,v):
+        assert v in self.domain
+
+        for f in self.received.values():
+            print f(v)
+        return reduce(lambda cum,f:cum * f(v),self.received.values(),1)
 
     
 class Soldier(Node):
+
+    def __init__(self,*args,**kwargs):
+        super(Soldier,self).__init__(type_ = "Soldier",*args,**kwargs)
+    
     def message_func(self,to_neighbour,feed_dict):
         def message():
             return reduce(lambda cum,v:cum+v(),feed_dict.values(),1)
@@ -140,8 +166,19 @@ class Graph(object):
         if node.name not in self.nodes:
             self.nodes[node.name] = node
 
-        if node.n_connections == 1:
+        if node.n_connections() == 1:
             self.leaves[node.name] = node
+
+        for con_name in node.get_connections():
+            if con_name not in self.nodes:
+                continue
+            con_node = self.nodes[con_name]
+            con_node.add_connection(node.name)
+            if con_node.n_connections() == 1:
+                self.leaves[con_name] = con_node
+            elif con_name in self.leaves:
+                del self.leaves[con_name]
+            
 
     def run(self):
         message_Q = deque()
@@ -177,42 +214,70 @@ if __name__=="__main__":
         return 0.9 if x2 == 1 else 0.1
 
     def f_3(x3):
-        return 0.1 if x2 == 1 else 0.9
+        return 0.1 if x3 == 1 else 0.9
 
 
     def f_4(x1,x2):
         return 1 if x1 == x2 else 0
 
-    def f_4(x2,x3):
-        return 1 if x3 == x3 else 0
+    def f_5(x2,x3):
+        return 1 if x2 == x3 else 0
 
+
+    
     graph = Graph()
     n_soldiers = 10
     for i in range(n_soldiers):
         if i == 0:
-            connections = ["1"]
-        elif i == n_soldiers-1:
-            connections = [str(i-1)]
-        elif i == 5:
-            node = Soldier(name=str(n_soldiers+1),type_="Soldier",connections = ["5",str(n_soldiers+2)])
-            graph.add_node(node)
-            node = Soldier(name=str(n_soldiers+2),type_="Soldier",connections = [str(n_soldiers+1)])
-            graph.add_node(node)
-            connections = [str(i-1),str(i+1),str(n_soldiers+1)]
+            connections = []
         else:
-            connections = [str(i-1),str(i+1)]
-        node = Soldier(name=str(i),type_="Soldier",connections = connections)
+            connections = [str(i-1)]
+        node = Soldier(name=str(i),connections = connections)
         graph.add_node(node)
+        #print graph.leaves
 
+    graph.add_node(Soldier(name=str(i+1),connections = ["4"]))
+    graph.add_node(Soldier(name=str(i+2),connections = [str(i+1)]))
+    
+    
     graph.run()
 
     for i in graph.nodes["Soldier"].values():
-        print i.count()
+        #print i.count()
         if i.count() != len(graph.nodes["Soldier"]):
             print "error with ",i.name
             break
     else:
         print "everything is great"
+
+
+    graph = Graph()
+
+    factors = [("f1",f_1,["x1"]),
+               ("f2",f_2,["x2"]),
+               ("f3",f_3,["x3"]),
+               ("f4",f_4,["x1","x2"]),
+               ("f5",f_5,["x2","x3"])]
+    
+    variables = [("x1",[0,1],["f1"]),
+                 ("x2",[0,1],["f2","f4"]),
+                 ("x3",[0,1],["f3","f5"])]
+
+    for var in variables:
+        name,domain,connections = var
+        node = Variable(name = name,domain = domain,connections = connections)
+        graph.add_node(node)
+
+    for fac in factors:
+        name,factor_func,connections = fac
+        node = Factor(name = name,factor_func = factor_func,connections = connections)
+        graph.add_node(node)
+
+    graph.run()
+
+    #for i in graph.nodes["Variable"].values():
+     #   print i.compute_marginal(1)
+        
             
     
     

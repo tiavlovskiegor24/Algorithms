@@ -1,6 +1,10 @@
 from message_passing import *
+from collections import namedtuple
 
 class Factor(Node):
+
+    #named tuple for the convenient factor creation
+    factor_tuple = namedtuple("Factor_tuple",["name","factor_func","connections"])
     
     def __init__(self,factor_func,*args,**kwargs):
         super(Factor,self).__init__(type_ = "Factor",*args,**kwargs)
@@ -17,8 +21,6 @@ class Factor(Node):
             variables[variable] = domain
             for value in domain:
                 evaluations[(variable,value)] = func(value)
-        
-        print "creating message from factor {} to variable {}".format(self.name,to_variable)    
             
         def message(x,**kwargs):
             marginal = 0
@@ -28,7 +30,7 @@ class Factor(Node):
                 g = self.generate_combinations(variables,remaining)
             else:
                 g = [[]]
-
+            
             for instances_list in g:
                 feed_dict = dict([(to_variable,x)]+instances_list)
                 factor_value = self.compute(**feed_dict)
@@ -55,16 +57,18 @@ class Factor(Node):
 
 
                         
+
 class Variable(Node):
 
+    # namedtuple for simplified initialisation of variable nodes
+    variable_tuple = namedtuple("Variable_tuple",["name","domain","connections","observed"])
+    
     def __init__(self,domain,observed = None,*args,**kwargs):
         super(Variable,self).__init__(type_ = "Variable",*args,**kwargs)
         self.domain = set(domain)
         self.observed = None if observed is None else set([observed])
 
     def message_func(self,to_factor,feed_dict):
-
-        print "creating message from variable {} to factor {}".format(self.name,to_factor)
             
         def message(x):
             return reduce(lambda cum,f:cum*f(x),feed_dict.values(),1)
@@ -91,7 +95,7 @@ class Variable(Node):
         for value in self.domain:
             evaluations[value] = reduce(lambda cum,f:cum * f(value),self.received.values(),1)
 
-        return sum(evaluations.values())
+        return sum(evaluations.values())    
     
     
 if __name__=="__main__":
@@ -111,41 +115,60 @@ if __name__=="__main__":
     def f_5(x2,x3):
         return 1 if x2 == x3 else 0
 
+    def f_6(x1,x3):
+        return 1 if x1 == x3 else 0
+    
     graph = Graph()
 
     factors = [("f1",f_1,["x1","r1"]),
                ("f2",f_2,["x2","r2"]),
                ("f3",f_3,["x3","r3"]),
                ("f4",f_4,["x1","x2"]),
-               ("f5",f_5,["x2","x3"])]
+               ("f5",f_5,["x2","x3"]),
+               ("f6",f_6,["x1","x3"]),
+    ]
 
-    received_bits = [("r1",[0,1],["f1"],1),
-                     ("r2",[0,1],["f2"],0),
-                     ("r3",[0,1],["f3"],0)]
-
-
+    factors = [Factor.factor_tuple(*f) for f in factors]
     
-    transmitted_bits = [("x1",[0,1],["f1"],None),
-                       ("x2",[0,1],["f2","f4"],None),
-                       ("x3",[0,1],["f3","f5"],None)]
+    v_f = {} # variables-factors dictionary
+    for factor in factors:
+        for v in factor.connections:
+            if v not in v_f:
+                v_f[v] = [factor.name]
+            else:
+                v_f[v].append(factor.name)
 
-    for var in received_bits:
-        name,domain,connections,observed = var
-        node = Variable(name = name,domain = domain,connections = connections,observed = observed)
+                
+    received_bits = [("r1",[0,1],v_f["r1"],0),
+                     ("r2",[0,1],v_f["r2"],1),
+                     ("r3",[0,1],v_f["r3"],0)]
+
+    received_bits = [Variable.variable_tuple(*v) for v in received_bits]
+    
+    transmitted_bits = [("x1",[0,1],v_f["x1"],None),
+                       ("x2",[0,1],v_f["x2"],None),
+                       ("x3",[0,1],v_f["x3"],None)]
+
+    transmitted_bits = [Variable.variable_tuple(*v) for v in transmitted_bits]
+
+
+    # convert node_tuples to graph nodes
+    factors = [Factor(**factor._asdict()) for factor in factors]
+    received_bits = [Variable(**variable._asdict()) for variable in received_bits]
+    transmitted_bits = [Variable(**variable._asdict()) for variable in transmitted_bits]
+    
+    
+
+    for node in received_bits:
         graph.add_node(node,category = "Received")
 
-    for var in transmitted_bits:
-        name,domain,connections,_ = var
-        node = Variable(name = name,domain = domain,connections = connections)
+    for node in transmitted_bits:
         graph.add_node(node,category = "Transmitted")
 
-        
-    for fac in factors:
-        name,factor_func,connections = fac
-        node = Factor(name = name,factor_func = factor_func,connections = connections)
+    for node in factors:
         graph.add_node(node,category = "Factors")
 
-    graph.run()
+    graph.run(n_iters = 200)
 
     for i in graph.nodes["Transmitted"].values():
         print i.name,(1,i.compute_marginal(1)),(0,i.compute_marginal(0))

@@ -35,7 +35,7 @@ class Node(object):
         self.to_send[con_name] = []
         
 
-    def send(self,to_connection = None):
+    def send(self,to_connection = None,init = False,verbose = False,**kwargs):
         '''
         method sends messages to connections if 
         received messages are available
@@ -51,14 +51,16 @@ class Node(object):
              #   yield None
               #  continue
                 
-            if len(self.to_send[to_connection]) < self.n_connections()-1:
+            if not init and len(self.to_send[to_connection]) < self.n_connections()-1:
                 yield None
                 continue
 
             feed_dict = dict(self.to_send[to_connection])
             self.to_send[to_connection] = []
             #self.sent.add(to_connection)
-            yield (to_connection,self.name,self.message_func(to_connection,feed_dict))
+            if verbose:
+                print "creating message from {} to {}".format(self.name,to_connection)    
+            yield (to_connection,self.name,self.message_func(to_connection,feed_dict,**kwargs))
 
 
     def receive(self,message):
@@ -80,6 +82,8 @@ class Node(object):
 
     
 class Graph(object):
+    '''object which routes messages between nodes'''
+    
     def __init__(self):
         self.nodes = {}
         self.leaves = {}
@@ -113,29 +117,33 @@ class Graph(object):
                 del self.leaves[con_name]
             
 
-    def run(self):
+    def run(self,n_iters = 100):
         '''method runs the forward-backward message passing'''
         
         message_Q = deque()
 
-        for node_name,node in self.leaves.iteritems():
-            messages = list(m for m in node.send() if m is not None)
+        #for node_name,node in self.leaves.iteritems():
+         #   messages = list(m for m in node.send() if m is not None)
+          #  message_Q.extend(messages)
+
+        for node_name,node in self.nodes["Variable"].iteritems():
+            messages = list(m for m in node.send(init = True) if m is not None)
             message_Q.extend(messages)
-            
+    
         c = 0
         while message_Q:
+            c += 1
             message = message_Q.popleft()
             to = message[0]
             assert to in self.nodes,(to,self.nodes.keys())
             to_node = self.nodes[to]
             to_node.receive(message)
-            if to not in self.leaves:
-                for m in to_node.send():
-                    if m is not None:
-                        message_Q.append(m)
-
-            if c > 1e5:
-                print "infinite loop"
-                return
+            #if to not in self.leaves:
+            for m in to_node.send():
+                if m is not None:
+                    message_Q.append(m)
+            if c > n_iters:
+                #print "infinite loop"
+                break #return
             
         print "Message passing is finished"

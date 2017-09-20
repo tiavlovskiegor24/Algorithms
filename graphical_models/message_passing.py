@@ -1,4 +1,4 @@
-from collections import deque
+from collections import deque,OrderedDict
 
 class Message(object):
     '''Generic class for messages between nodes'''
@@ -17,6 +17,7 @@ class Node(object):
         self.type_ = type_
         self.received = {}
         self.to_send = {}
+        self.sent_count = 0
         for con_name in connections:
             self.add_connection(con_name)
         
@@ -33,13 +34,31 @@ class Node(object):
         '''method adds new connection to the node'''
         self.received[con_name] = None
         self.to_send[con_name] = []
+
+    def reset_sent_count(self):
+        self.sent_count = 0
         
 
-    def send(self,to_connection = None,init = False,verbose = False,**kwargs):
+    def send(self,to_connection = None,
+             init = False,
+             limit = None,
+             reset_sent_count = False,
+             verbose = False,
+             **kwargs
+    ):
         '''
         method sends messages to connections if 
         received messages are available
         '''
+
+        if reset_sent_count:
+            self.sent_count = 0
+            
+        if limit is not None:
+            if self.sent_count == limit*self.n_connections():
+                return
+
+        
         if to_connection is not None:
             to_list = [to_connection]
         else:
@@ -61,13 +80,14 @@ class Node(object):
             if verbose:
                 print "creating message from {} to {}".format(self.name,to_connection)    
             yield (to_connection,self.name,self.message_func(to_connection,feed_dict,**kwargs))
-
+            if not init:
+                self.sent_count += 1
 
     def receive(self,message):
         '''method to receive message from a connection'''
         to,from_,content = message
         assert to == self.name
-        assert from_ in self.get_connections()
+        assert from_ in self.get_connections(),(self.name,from_,self.get_connections())
         self.received[from_] = content
 
         for c in self.get_connections():
@@ -84,15 +104,17 @@ class Node(object):
 class Graph(object):
     '''object which routes messages between nodes'''
     
-    def __init__(self):
-        self.nodes = {}
+    def __init__(self,type_=None):
+        self.type_ = type_
+        self.nodes = {"all":OrderedDict()}
         self.leaves = {}
+        self.message_Q = deque()
     
     def add_node(self,node,category):
 
         if category is not None:
             if category not in self.nodes:
-                self.nodes[category] = {}
+                self.nodes[category] = OrderedDict()
 
             self.nodes[category][node.name] = node
             
@@ -100,8 +122,8 @@ class Graph(object):
             self.nodes[node.type_] = {}
         self.nodes[node.type_][node.name] = node
 
-        if node.name not in self.nodes:
-            self.nodes[node.name] = node
+        if node.name not in self.nodes["all"]:
+            self.nodes["all"][node.name] = node
 
         if node.n_connections() == 1:
             self.leaves[node.name] = node
@@ -116,34 +138,49 @@ class Graph(object):
             elif con_name in self.leaves:
                 del self.leaves[con_name]
             
+    def reset_message_Q(self):
+        self.message_Q = deque()
 
-    def run(self,n_iters = 100):
-        '''method runs the forward-backward message passing'''
-        
-        message_Q = deque()
+    def clear_message_Q(self):
 
-        #for node_name,node in self.leaves.iteritems():
-         #   messages = list(m for m in node.send() if m is not None)
-          #  message_Q.extend(messages)
-
-        for node_name,node in self.nodes["Variable"].iteritems():
-            messages = list(m for m in node.send(init = True) if m is not None)
-            message_Q.extend(messages)
-    
         c = 0
-        while message_Q:
+        while self.message_Q:
             c += 1
-            message = message_Q.popleft()
+            message = self.message_Q.popleft()
             to = message[0]
             assert to in self.nodes,(to,self.nodes.keys())
             to_node = self.nodes[to]
             to_node.receive(message)
-            #if to not in self.leaves:
-            for m in to_node.send():
-                if m is not None:
-                    message_Q.append(m)
-            if c > n_iters:
+            if c > 1e6:
                 #print "infinite loop"
+                break #return
+        
+                
+    def run(self,n_iters = 1e6,init_node_type = "all",**kwargs):
+        '''method runs the forward-backward message passing'''
+
+        #for node_name,node in self.leaves.iteritems():
+         #   messages = list(m for m in node.send() if m is not None)
+          #  message_Q.extend(messages)
+            
+        for node_name,node in self.nodes[init_node_type].iteritems():
+            messages = list(m for m in node.send(init = True) if m is not None)
+            self.message_Q.extend(messages)
+    
+        c = 0
+        while self.message_Q:
+            c += 1
+            message = self.message_Q.popleft()
+            to = message[0]
+            assert to in self.nodes["all"],(to,self.nodes["all"].keys())
+            to_node = self.nodes["all"][to]
+            to_node.receive(message)
+            #if to not in self.leaves:
+            for m in to_node.send(**kwargs):
+                if m is not None:
+                    self.message_Q.append(m)
+            if c > n_iters:
+                print "infinite loop"
                 break #return
             
         print "Message passing is finished"

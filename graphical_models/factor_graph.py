@@ -17,10 +17,10 @@ class Factor(Node):
 
         evaluations = {}
         variables = {}
-        for variable,(func,domain) in feed_dict.iteritems():
-            variables[variable] = domain
-            for value in domain:
-                evaluations[(variable,value)] = func(value)
+        for variable,evals in feed_dict.iteritems():
+            variables[variable] = set(evals.keys())
+            for v in evals:
+                evaluations[(variable,v)] = evals[v]
             
         def message(x,**kwargs):
             marginal = 0
@@ -33,7 +33,7 @@ class Factor(Node):
             
             for instances_list in g:
                 feed_dict = dict([(to_variable,x)]+instances_list)
-                factor_value = self.compute(**feed_dict)
+                factor_value = self.compute(feed_dict)
                 cum_prod = reduce(lambda cum,var_val: cum * evaluations[var_val],
                                   instances_list,1)
 
@@ -50,7 +50,7 @@ class Factor(Node):
                 if len(remaining) == 1:
                     yield [(variable,value)]
                 else:
-                    g = generate_combinations(variables_dict,
+                    g = Factor.generate_combinations(variables_dict,
                                               remaining - set([variable]))
                     for instances_list in g:
                         yield [(variable,value)]+instances_list
@@ -68,21 +68,40 @@ class Variable(Node):
         self.domain = set(domain)
         self.observed = None if observed is None else set([observed])
 
+    def set_as_observed(self,value):
+        assert value in self.domain
+        self.observed = set([value])
+
+    def set_as_unobserved(self):
+        self.observed = None
+
     def message_func(self,to_factor,feed_dict):
-            
-        def message(x):
-            return reduce(lambda cum,f:cum*f(x),feed_dict.values(),1)
 
-        return (message,self.domain if self.observed is None else self.observed)
+        
+    #    def message(x):
+     #       return reduce(lambda cum,f:cum*f(x),feed_dict.values(),1)
 
+      #  return (message,self.domain if self.observed is None else self.observed)
+
+        evaluations = {}
+        values = self.domain if self.observed is None else self.observed
+        for v in values:
+            evaluations[v] = reduce(lambda cum,f:cum*f(v),feed_dict.values(),1)
+
+        norm_const = sum(evaluations.values())
+        for v in evaluations:
+            evaluations[v] = evaluations[v]*1./norm_const 
+
+        return evaluations
+    
+    
     def compute_marginal(self,v):
 
-        if self.observed is not None:
-            print "Variable is observed with value {}".format([x for x in self.observed][0])
-            return None
-        
         assert v in self.domain
         
+        if self.observed is not None:
+            #print "Variable is observed with value {}".format([x for x in self.observed][0])
+            return 1. if v in self.observed else 0.
         
         marginal = reduce(lambda cum,f:cum * f(v),self.received.values(),1)
 
@@ -98,77 +117,3 @@ class Variable(Node):
         return sum(evaluations.values())    
     
     
-if __name__=="__main__":
-    
-    def f_1(r1,x1):
-        return 0.9 if x1 == r1 else 0.1
-
-    def f_2(r2,x2):
-        return 0.9 if x2 == r2 else 0.1
-
-    def f_3(r3,x3):
-        return 0.9 if x3 == r3 else 0.1
-
-    def f_4(x1,x2):
-        return 1 if x1 == x2 else 0
-
-    def f_5(x2,x3):
-        return 1 if x2 == x3 else 0
-
-    def f_6(x1,x3):
-        return 1 if x1 == x3 else 0
-    
-    graph = Graph()
-
-    factors = [("f1",f_1,["x1","r1"]),
-               ("f2",f_2,["x2","r2"]),
-               ("f3",f_3,["x3","r3"]),
-               ("f4",f_4,["x1","x2"]),
-               ("f5",f_5,["x2","x3"]),
-               ("f6",f_6,["x1","x3"]),
-    ]
-
-    factors = [Factor.factor_tuple(*f) for f in factors]
-    
-    v_f = {} # variables-factors dictionary
-    for factor in factors:
-        for v in factor.connections:
-            if v not in v_f:
-                v_f[v] = [factor.name]
-            else:
-                v_f[v].append(factor.name)
-
-                
-    received_bits = [("r1",[0,1],v_f["r1"],0),
-                     ("r2",[0,1],v_f["r2"],1),
-                     ("r3",[0,1],v_f["r3"],0)]
-
-    received_bits = [Variable.variable_tuple(*v) for v in received_bits]
-    
-    transmitted_bits = [("x1",[0,1],v_f["x1"],None),
-                       ("x2",[0,1],v_f["x2"],None),
-                       ("x3",[0,1],v_f["x3"],None)]
-
-    transmitted_bits = [Variable.variable_tuple(*v) for v in transmitted_bits]
-
-
-    # convert node_tuples to graph nodes
-    factors = [Factor(**factor._asdict()) for factor in factors]
-    received_bits = [Variable(**variable._asdict()) for variable in received_bits]
-    transmitted_bits = [Variable(**variable._asdict()) for variable in transmitted_bits]
-    
-    
-
-    for node in received_bits:
-        graph.add_node(node,category = "Received")
-
-    for node in transmitted_bits:
-        graph.add_node(node,category = "Transmitted")
-
-    for node in factors:
-        graph.add_node(node,category = "Factors")
-
-    graph.run(n_iters = 200)
-
-    for i in graph.nodes["Transmitted"].values():
-        print i.name,(1,i.compute_marginal(1)),(0,i.compute_marginal(0))

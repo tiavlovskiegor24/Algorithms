@@ -1,5 +1,6 @@
 from message_passing import *
 from collections import namedtuple
+from operator import itemgetter
 
 class Factor(Node):
 
@@ -13,7 +14,7 @@ class Factor(Node):
     def __call__(self,**kwargs):
         return self.compute(**kwargs)
 
-    def message_func(self,to_variable,feed_dict):
+    def message_func(self,to_variable,feed_dict,message_type = "sum_prod"):
 
         evaluations = {}
         variables = {}
@@ -23,7 +24,7 @@ class Factor(Node):
                 evaluations[(variable,v)] = evals[v]
             
         def message(x,**kwargs):
-            marginal = 0
+            result = 0
 
             remaining = set(variables.keys())
             if variables:
@@ -37,8 +38,11 @@ class Factor(Node):
                 cum_prod = reduce(lambda cum,var_val: cum * evaluations[var_val],
                                   instances_list,1)
 
-                marginal += factor_value*cum_prod
-            return marginal
+                if message_type == "sum_prod":
+                    result += factor_value*cum_prod
+                elif message_type == "max_mult":
+                    result = max(result,factor_value*cum_prod)
+            return result
 
         return message
 
@@ -75,7 +79,7 @@ class Variable(Node):
     def set_as_unobserved(self):
         self.observed = None
 
-    def message_func(self,to_factor,feed_dict):
+    def message_func(self,to_factor,feed_dict,message_type = "sum_prod"):
 
         
     #    def message(x):
@@ -83,31 +87,38 @@ class Variable(Node):
 
       #  return (message,self.domain if self.observed is None else self.observed)
 
+        self.message_type = message_type
         evaluations = {}
         values = self.domain if self.observed is None else self.observed
         for v in values:
             evaluations[v] = reduce(lambda cum,f:cum*f(v),feed_dict.values(),1)
 
-        norm_const = sum(evaluations.values())
-        for v in evaluations:
-            evaluations[v] = evaluations[v]*1./norm_const 
+        if message_type == "sum_prod":    
+            norm_const = sum(evaluations.values())
+            for v in evaluations:
+                evaluations[v] = evaluations[v]*1./norm_const 
 
+        #if message_type == "sum_prod":
         return evaluations
+        #else:
+         #   return max(,key = itemgetter(1))
     
     
-    def compute_marginal(self,v):
-
+    def compute(self,v):
+        
         assert v in self.domain
         
         if self.observed is not None:
             #print "Variable is observed with value {}".format([x for x in self.observed][0])
             return 1. if v in self.observed else 0.
         
-        marginal = reduce(lambda cum,f:cum * f(v),self.received.values(),1)
+        result = reduce(lambda cum,f:cum * f(v),self.received.values(),1)
+        if self.message_type == "sum_prod":
+            print self.message_type
+            norm_const = self.compute_norm_const()
+            result = result*1./norm_const
 
-        norm_const = self.compute_norm_const()
-        
-        return marginal*1./norm_const
+        return result
 
     def compute_norm_const(self):
         evaluations = {}

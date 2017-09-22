@@ -164,7 +164,7 @@ class Graph(object):
           #  message_Q.extend(messages)
             
         for node_name,node in self.nodes[init_node_type].iteritems():
-            messages = list(m for m in node.send(init = True) if m is not None)
+            messages = list(m for m in node.send(init = True,**kwargs) if m is not None)
             self.message_Q.extend(messages)
     
         c = 0

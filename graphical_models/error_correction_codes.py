@@ -129,7 +129,7 @@ class Repeat_Code(Graph):
         self.run(init_node_type = "Variable",**kwargs)
 
         for node in self.nodes["Transmitted_bits"].values():
-            print node.name,(1,node.compute_marginal(1)),(0,node.compute_marginal(0))
+            print node.name,(1,node.compute(1)),(0,node.compute(0))
             
         
 
@@ -226,26 +226,26 @@ class Hamming_Code(Graph):
         self.run(init_node_type="Variable",**kwargs)
 
         for name,node in self.nodes["Noise_bits"].iteritems():
-            max_prob = max([(1,node.compute_marginal(1)),(0,node.compute_marginal(0))],key=itemgetter(1))
-            if max_prob[-1] > 0.9:
+            max_prob = max([(1,node.compute(1)),(0,node.compute(0))],key=itemgetter(1))
+            if max_prob[-1] > 1.9:
                 self.nodes["Noise_bits"][name].set_as_observed(max_prob[0])
 
         self.run(init_node_type="Variable",**kwargs)
 
         for name,node in self.nodes["Noise_bits"].iteritems():
-            max_prob = max([(1,node.compute_marginal(1)),(0,node.compute_marginal(0))],key=itemgetter(1))
+            max_prob = max([(1,node.compute(1)),(0,node.compute(0))],key=itemgetter(1))
             print name,max_prob
             
 
 if __name__=="__main__":
     
     
-    #repeat_code = Repeat_Code(n_repeats = 7,flip_prob = 0.1)
+    repeat_code = Repeat_Code(n_repeats = 7,flip_prob = 0.1)
 
-    #received_bits = [1,1,1,1,0,0,0]
-    #repeat_code.decode(received_bits,limit = 7)
+    received_bits = [1,1,1,0,0,0,0]
+    repeat_code.decode(received_bits,limit = 7,message_type = "max_mult")
     #print reduce(lambda cum,x:cum*(0.9),received_bits,1)
 
     h_code = Hamming_Code(flip_prob=0.1)
-    syndrome_bits = [1,1,1]
-    h_code.decode(syndrome_bits,limit = 10)
+    syndrome_bits = [1,0,0]
+    h_code.decode(syndrome_bits,limit = 10,message_type = "max_mult")

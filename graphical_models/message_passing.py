@@ -16,6 +16,7 @@ class Node(object):
         self.name = name
         self.type_ = type_
         self.received = {}
+        self.connections = set()
         self.to_send = {}
         self.sent_count = 0
         for con_name in connections:
@@ -34,12 +35,13 @@ class Node(object):
         '''method adds new connection to the node'''
         self.received[con_name] = None
         self.to_send[con_name] = []
+        self.connections.add(con_name)
 
     def reset_sent_count(self):
         self.sent_count = 0
         
 
-    def send(self,to_connection = None,
+    def send(self,to_list = None,
              init = False,
              limit = None,
              reset_sent_count = False,
@@ -58,12 +60,9 @@ class Node(object):
             if self.sent_count == limit*self.n_connections():
                 return
 
-        
-        if to_connection is not None:
-            to_list = [to_connection]
-        else:
+        if to_list is None:
             to_list = list(self.get_connections())
-
+            
         for to_connection in to_list:
             
             #if to_connection in self.sent:
@@ -75,8 +74,8 @@ class Node(object):
                 continue
 
             feed_dict = dict(self.to_send[to_connection])
-            self.to_send[to_connection] = []
-            #self.sent.add(to_connection)
+            del self.to_send[to_connection][:]
+            
             if verbose:
                 print "creating message from {} to {}".format(self.name,to_connection)    
             yield (to_connection,self.name,self.message_func(to_connection,feed_dict,**kwargs))
@@ -87,7 +86,7 @@ class Node(object):
         '''method to receive message from a connection'''
         to,from_,content = message
         assert to == self.name
-        assert from_ in self.get_connections(),(self.name,from_,self.get_connections())
+        assert from_ in self.received,(self.name,from_,self.get_connections())
         self.received[from_] = content
 
         for c in self.get_connections():
@@ -99,7 +98,32 @@ class Node(object):
         '''method generates messages for the connected nodes'''
         return lambda x:None
 
+class Recurrent_Node(Node):
+    '''Node which can send message to several "timesteps" of itself'''
+    def __init__(self,n_steps = 0,*args,**kwargs):
+        super(Recurrent_Node,self).__init__(*args,**kwargs)
+        self.n_steps = n_steps
+        self.current_step = 0
+        for i in range(n_steps):
+            self.add_connection("{}_{}".format(self.name,i))
 
+    def send(self,*args,**kwargs):
+        to_list = list(self.get_connections())
+        exclude_set = set(["{}_{}".format(self.name,i) for i in range(self.n_steps)])
+        to_list = [con for con in to_list if con not in exclude_set]
+        for message in super(Recurrent_Node,self).send(to_list = to_list,*args,**kwargs):
+            yield message
+
+    def recieve(self,message,*args,**kwargs):
+        to,from_,content = message
+        if to.split("_")[0] in self.received:
+            message = (to.split("_")[0],from_,content)
+            super(Recurrent_Node,self).receive(message)
+        else:
+            print "Message misdirected",to,from_
+            
+        
+        
     
 class Graph(object):
     '''object which routes messages between nodes'''
@@ -156,17 +180,25 @@ class Graph(object):
                 break #return
         
                 
-    def run(self,n_iters = 1e6,init_node_type = "all",**kwargs):
+    def run(self,n_iters = 1e6,init_node_type = None,**kwargs):
         '''method runs the forward-backward message passing'''
 
         #for node_name,node in self.leaves.iteritems():
          #   messages = list(m for m in node.send() if m is not None)
           #  message_Q.extend(messages)
+
+          
+        if init_node_type is None:
+            init_node_type = "all"
+            init = False
+        else:
+            init = True
+            
             
         for node_name,node in self.nodes[init_node_type].iteritems():
-            messages = list(m for m in node.send(init = True,**kwargs) if m is not None)
+            messages = list(m for m in node.send(init = init,**kwargs) if m is not None)
             self.message_Q.extend(messages)
-    
+                
         c = 0
         while self.message_Q:
             c += 1

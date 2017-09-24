@@ -42,15 +42,29 @@ def binary_parity_constraint(valid_variables_tuples = None):
     return check_parity
     
 
-
 class Repeat_Code(Graph):
     def __init__(self,n_repeats,flip_prob,*args,**kwargs):
         super(Repeat_Code,self).__init__(type_="Repeat_Code",*args,**kwargs)
         self.n_repeats = n_repeats
         self.flip_prob = flip_prob
         self.create_graph()
-        
+
     def create_graph(self):
+        self.likelihood_func = binary_sym_channel(self.flip_prob,["t","r"])
+        likelihood_factor = Factor(name = "likelihood",
+                                   factor_func = self.likelihood_func,
+                                   connections = ["t","r"]
+        )
+        transmitted_bits = Recurrent_Variable(name = "t",
+                                              n_steps = self.n_repeats,
+                                              domain = [0,1],
+                                              connections = ["likelihood","equality"],
+                                              observed = None,
+        )
+        received_bits = Recurrent_Variable(name = "r")
+        
+        
+    def create_graph1(self):
         likelihood_factors = OrderedDict()
         transmitted_bits = [] 
         received_bits = []
@@ -126,7 +140,7 @@ class Repeat_Code(Graph):
         for i,b in enumerate(received_bits):
             self.nodes["Received_bits"]["r_{}".format(i)].set_as_observed(b)
 
-        self.run(init_node_type = "Variable",**kwargs)
+        self.run(**kwargs)
 
         for node in self.nodes["Transmitted_bits"].values():
             print node.name,(1,node.compute(1)),(0,node.compute(0))
@@ -242,10 +256,10 @@ if __name__=="__main__":
     
     repeat_code = Repeat_Code(n_repeats = 7,flip_prob = 0.1)
 
-    received_bits = [1,1,1,0,0,0,0]
-    repeat_code.decode(received_bits,limit = 7,message_type = "max_mult")
+    received_bits = [1,0,1,1,1,0,1]
+    repeat_code.decode(received_bits,limit = 10,message_type = "sum_prod",init_node_type = "Variable")
     #print reduce(lambda cum,x:cum*(0.9),received_bits,1)
 
     h_code = Hamming_Code(flip_prob=0.1)
     syndrome_bits = [1,0,0]
-    h_code.decode(syndrome_bits,limit = 10,message_type = "max_mult")
+    h_code.decode(syndrome_bits,limit = 20,message_type = "sum_prod")

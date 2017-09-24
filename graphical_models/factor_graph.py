@@ -70,11 +70,11 @@ class Variable(Node):
     def __init__(self,domain,observed = None,*args,**kwargs):
         super(Variable,self).__init__(type_ = "Variable",*args,**kwargs)
         self.domain = set(domain)
-        self.observed = None if observed is None else set([observed])
+        self.observed = observed
 
     def set_as_observed(self,value):
         assert value in self.domain
-        self.observed = set([value])
+        self.observed = value
 
     def set_as_unobserved(self):
         self.observed = None
@@ -89,7 +89,7 @@ class Variable(Node):
 
         self.message_type = message_type
         evaluations = {}
-        values = self.domain if self.observed is None else self.observed
+        values = self.domain #if self.observed is None else self.observed
         for v in values:
             evaluations[v] = reduce(lambda cum,f:cum*f(v),feed_dict.values(),1)
 
@@ -99,7 +99,10 @@ class Variable(Node):
                 evaluations[v] = evaluations[v]*1./norm_const 
 
         #if message_type == "sum_prod":
-        return evaluations
+        if self.observed is None:
+            return evaluations
+        else:
+            return {self.observed:evaluations[self.observed]}
         #else:
          #   return max(,key = itemgetter(1))
     
@@ -110,11 +113,10 @@ class Variable(Node):
         
         if self.observed is not None:
             #print "Variable is observed with value {}".format([x for x in self.observed][0])
-            return 1. if v in self.observed else 0.
+            return 1. if v == self.observed else 0.
         
         result = reduce(lambda cum,f:cum * f(v),self.received.values(),1)
         if self.message_type == "sum_prod":
-            print self.message_type
             norm_const = self.compute_norm_const()
             result = result*1./norm_const
 
@@ -127,4 +129,82 @@ class Variable(Node):
 
         return sum(evaluations.values())    
     
+    
+class Recurrent_Variable(Variable):
+    '''Node which can send message to several "timesteps" of itself'''
+    def __init__(self,n_steps = 0,transition_func,*args,**kwargs):
+
+        super(Recurrent_Node,self).__init__(*args,**kwargs)
+
+        self.n_steps = n_steps
+        self.steps = []
+        steps.append(dict(received = [],
+                          to_send = dict([("n",[])]+
+                                         [(con,[]) for con in connections])))
+        for i in range(1,n_steps-1):
+            steps.append(dict(received = [],
+                              to_send = dict([("p",[]),("n",[])]+
+                                             [(con,[]) for con in connections])))
+        steps.append(dict(received = [],
+                          to_send = dict([("p",[])]+
+                                         [(con,[]) for con in connections])))
+              
+        self.go_to_step(0)
+        
+        self.transition_func = transition_func
+        self.transition_factor = Factor(name="t_factor".format(self.name),
+                                        factor_func = self.transition_func,
+                                        connections = ["p","n"],
+        )
+        
+
+    def go_to_step(self,step):
+        self.current_step = step
+        self.received = self.steps[step]["received"]
+        self.to_send = {con:contents for con,contents
+                        in self.steps[step]["to_send"].iteritems()
+                        if con in self.connections}
+        
+        self.to_send_steps = {con:contents for con,contents
+                              in self.steps[step]["to_send"].iteritems()
+                              if con in ["p","n"]}
+
+    def send(self,*args,**kwargs):
+        #first send messages to next and previous steps
+        
+        for step in ["p","n"]:
+
+            if step not in self.to_send_steps:
+                continue
+            if len(self.to_send_steps[step]) < self.n_connections()+1:
+                continue
+            to_step = step
+            
+        from_step = "p" if to_step == "n" else "n"
+        feed_dict = dict(self.to_send_steps[to_step])
+        del self.to_send_steps[to_step][:]
+        message_to = self.message_func(to_step,feed_dict,**kwargs)
+        self.transition_factor.receive(("t_factor",from_step,message_to))
+        message_back = list(self.transition_factor.send())
+        assert message_back
+        message_back = message_back.pop()
+        assert message_back[0] == to_step
+
+        #send messages to outside connection
+        to_list = self.connections.keys()
+        for message in super(Recurrent_Node,self).send(*args,**kwargs):
+            yield message
+
+        # go to next step
+        next_step = self.current_step + (1 if to_step == "n" else -1)        
+        self.go_to_step(next_step)
+        
+    def recieve(self,*args,**kwargs):
+
+        super(Recurrent_Variable,self).receive(*args,**kwargs)
+        to,from_,content = message
+        for step in self.to_send_steps:
+            self.to_send_steps[step].append((from_,content))
+        
+
     

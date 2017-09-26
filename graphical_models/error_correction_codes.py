@@ -28,6 +28,11 @@ def binary_equality_constraint(valid_variables_tuples = None):
 
     return check_equality
 
+def check_equality(variables_dict):
+    
+    return variables_dict["p"] == variables_dict["n"]
+    #return int(values[0]*len(values) == sum(values))
+
 
 def binary_parity_constraint(valid_variables_tuples = None):
     '''factory creates parity check function for several binary variables'''
@@ -54,18 +59,26 @@ class Repeat_Code(Graph):
                                    factor_func = binary_sym_channel(self.flip_prob,[("t","r")]),
                                    connections = ["t","r"]
         )
+        self.add_node(likelihood_factor,category = "Likelihood_factor")
+
         transmitted_bits = Recurrent_Variable(name = "t",
                                               n_steps = self.n_repeats,
-                                              transition_func = binary_equality_constraint([("n","p")]),
+                                              transition_func = check_equality,
+                                              #binary_equality_constraint([("n","p")]),
                                               domain = [0,1],
                                               connections = ["likelihood"],
-                                              observed = None,
+                                              observed_steps = None,
                                               
         )
-        received_bits = Variable(name = "r",
-                                 connections = ["likelihood"],
-                                 domain = [0,1],
-                                 observed = None)
+        self.add_node(transmitted_bits,category = "Transmitted_bits")
+
+        received_bits = Recurrent_Variable(name = "r",
+                                           n_steps = self.n_repeats,
+                                           connections = ["likelihood"],
+                                           domain = [0,1],
+                                           observed_steps = None)
+
+        self.add_node(received_bits,category = "Received_bits")
         
         
     def create_graph1(self):
@@ -141,8 +154,17 @@ class Repeat_Code(Graph):
         return [bit]*self.n_repeats
 
     def decode(self,received_bits,**kwargs):
+
+        self.nodes["Received_bits"]["r"].set_as_observed(received_bits)
         
-        
+        self.run(init_node_type = "Received_bits",**kwargs)
+
+        node = self.nodes["Transmitted_bits"]["t"]
+        for i in range(node.n_steps):
+            node.go_to_step(i)
+            print i,(1,node.compute(1)),(0,node.compute(0)),node.compute(1)/node.compute(0)
+
+        '''
         for i,b in enumerate(received_bits):
             self.nodes["Received_bits"]["r_{}".format(i)].set_as_observed(b)
 
@@ -150,7 +172,7 @@ class Repeat_Code(Graph):
 
         for node in self.nodes["Transmitted_bits"].values():
             print node.name,(1,node.compute(1)),(0,node.compute(0))
-            
+        '''  
         
 
 class Hamming_Code(Graph):
@@ -262,10 +284,11 @@ if __name__=="__main__":
     
     repeat_code = Repeat_Code(n_repeats = 7,flip_prob = 0.1)
 
-    received_bits = [1,0,1,1,1,0,1]
-    repeat_code.decode(received_bits,limit = 10,message_type = "sum_prod",init_node_type = "Variable")
+    received_bits = [1,1,5,1,1,1,1]
+    repeat_code.decode(received_bits,limit = 100,message_type = "sum_prod",verbose = False)
     #print reduce(lambda cum,x:cum*(0.9),received_bits,1)
-
+    '''
     h_code = Hamming_Code(flip_prob=0.1)
     syndrome_bits = [1,0,0]
     h_code.decode(syndrome_bits,limit = 20,message_type = "sum_prod")
+    '''

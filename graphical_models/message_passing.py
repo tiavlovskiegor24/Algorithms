@@ -1,12 +1,7 @@
-from collections import deque,OrderedDict
+from collections import deque,OrderedDict,namedtuple
 
-class Message(object):
-    '''Generic class for messages between nodes'''
-    def __init__(self,to,from_,content):
-        self.to = to
-        self.from_ = from_
-        self.description = "Message to '{}' from '{}'".format(to,from_)
-        self.content = content
+#named tuple for sent messages within the graph
+message_tuple = namedtuple("Message","to from_ when content")
 
 
 class Node(object):
@@ -34,7 +29,7 @@ class Node(object):
     def add_connection(self,con_name):
         '''method adds new connection to the node'''
         self.received[con_name] = None
-        self.to_send[con_name] = []
+        self.to_send[con_name] = {}
         self.connections.add(con_name)
 
     def reset_sent_count(self):
@@ -45,6 +40,7 @@ class Node(object):
              init = False,
              limit = None,
              reset_sent_count = False,
+             when = None,
              verbose = False,
              **kwargs
     ):
@@ -70,33 +66,47 @@ class Node(object):
               #  continue
                 
             if not init and len(self.to_send[to_connection]) < len(self.to_send)-1:
-                yield None
+                #yield None
                 continue
 
             feed_dict = dict(self.to_send[to_connection])
-            del self.to_send[to_connection][:]
+            #del self.to_send[to_connection][:]            
+
+            self.to_send[to_connection].clear()
             
             if verbose:
-                print "creating message from {} to {}".format(self.name,to_connection)    
-            yield (to_connection,self.name,self.message_func(to_connection,feed_dict,**kwargs))
+                print "creating message from {} to {}".format(self.name,to_connection)
+
+            message = message_tuple(to = to_connection,
+                                        from_ = self.name,
+                                        when = when,
+                                        content = self.message_func(to_connection,feed_dict,**kwargs))
+            yield message
+
             if not init:
                 self.sent_count += 1
 
     def receive(self,message):
         '''method to receive message from a connection'''
-        to,from_,content = message
-        assert to == self.name
-        assert from_ in self.received,(self.name,from_,self.get_connections())
-        self.received[from_] = content
+        #to,from_,content = message
+        message = message._asdict()
+        assert message["to"] == self.name
+        assert message['from_'] in self.received,(self.name,message['from_'],self.get_connections())
+        self.received[message['from_']] = message['content']
 
-        for c in self.get_connections():
-            if c != from_:
-                self.to_send[c].append((from_,content))
+        for con in self.get_connections():
+            if con != message['from_']:
+                self.to_send[con][message['from_']] = message['content']
+                #self.to_send[con].append((message['from_'],message['content']))
 
         
     def message_func(self,to_connection,**kwargs):
         '''method generates messages for the connected nodes'''
         return lambda x:None
+
+
+
+    
 
 class Recurrent_Node(Node):
     '''Node which can send message to several "timesteps" of itself'''
@@ -120,10 +130,7 @@ class Recurrent_Node(Node):
             message = (to.split("_")[0],from_,content)
             super(Recurrent_Node,self).receive(message)
         else:
-            print "Message misdirected",to,from_
-            
-        
-        
+            print "Message misdirected",to,from_        
     
 class Graph(object):
     '''object which routes messages between nodes'''
@@ -180,13 +187,12 @@ class Graph(object):
                 break #return
         
                 
-    def run(self,n_iters = 1e6,init_node_type = None,**kwargs):
+    def run(self,n_iters = 1e6,init_node_type = None,verbose = False,**kwargs):
         '''method runs the forward-backward message passing'''
 
         #for node_name,node in self.leaves.iteritems():
          #   messages = list(m for m in node.send() if m is not None)
           #  message_Q.extend(messages)
-
           
         if init_node_type is None:
             init_node_type = "all"
@@ -198,14 +204,18 @@ class Graph(object):
         for node_name,node in self.nodes[init_node_type].iteritems():
             messages = list(m for m in node.send(init = init,**kwargs) if m is not None)
             self.message_Q.extend(messages)
-                
+
         c = 0
         while self.message_Q:
             c += 1
             message = self.message_Q.popleft()
-            to = message[0]
+            to = message.to
             assert to in self.nodes["all"],(to,self.nodes["all"].keys())
             to_node = self.nodes["all"][to]
+            
+            if verbose == True:
+                print "\nDelivering {}".format(message)
+
             to_node.receive(message)
             #if to not in self.leaves:
             for m in to_node.send(**kwargs):

@@ -25,11 +25,11 @@ class Node(object):
         
     def n_connections(self):
         '''method returns the number of connections'''
-        return len(self.received)
+        return len(self.connections)
 
     def get_connections(self):
         '''method returns the list of connection names'''
-        return self.received.keys()
+        return list(self.connections)
     
     def add_connection(self,con_name):
         '''method adds new connection to the node'''
@@ -69,7 +69,7 @@ class Node(object):
              #   yield None
               #  continue
                 
-            if not init and len(self.to_send[to_connection]) < self.n_connections()-1:
+            if not init and len(self.to_send[to_connection]) < len(self.to_send)-1:
                 yield None
                 continue
 

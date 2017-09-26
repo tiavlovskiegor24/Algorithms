@@ -50,18 +50,22 @@ class Repeat_Code(Graph):
         self.create_graph()
 
     def create_graph(self):
-        self.likelihood_func = binary_sym_channel(self.flip_prob,["t","r"])
         likelihood_factor = Factor(name = "likelihood",
-                                   factor_func = self.likelihood_func,
+                                   factor_func = binary_sym_channel(self.flip_prob,[("t","r")]),
                                    connections = ["t","r"]
         )
         transmitted_bits = Recurrent_Variable(name = "t",
                                               n_steps = self.n_repeats,
+                                              transition_func = binary_equality_constraint([("n","p")]),
                                               domain = [0,1],
-                                              connections = ["likelihood","equality"],
+                                              connections = ["likelihood"],
                                               observed = None,
+                                              
         )
-        received_bits = Recurrent_Variable(name = "r")
+        received_bits = Variable(name = "r",
+                                 connections = ["likelihood"],
+                                 domain = [0,1],
+                                 observed = None)
         
         
     def create_graph1(self):
@@ -137,6 +141,8 @@ class Repeat_Code(Graph):
         return [bit]*self.n_repeats
 
     def decode(self,received_bits,**kwargs):
+        
+        
         for i,b in enumerate(received_bits):
             self.nodes["Received_bits"]["r_{}".format(i)].set_as_observed(b)
 

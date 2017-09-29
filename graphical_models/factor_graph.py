@@ -24,7 +24,10 @@ class Factor(Node):
                 evaluations[(variable,v)] = evals[v]
             
         def message(x,**kwargs):
+            #if message_type == "sum_prod":
             result = 0
+            #elif message_type == "max_sum":
+             #   result = -float("inf")
 
             remaining = set(variables.keys())
             if variables:
@@ -37,7 +40,7 @@ class Factor(Node):
                 factor_value = self.compute(feed_dict)
                 cum_prod = reduce(lambda cum,var_val: cum * evaluations[var_val],
                                   instances_list,1)
-
+                #assert message_type == "max_mult"
                 if message_type == "sum_prod":
                     result += factor_value*cum_prod
                 elif message_type == "max_mult":
@@ -69,6 +72,7 @@ class Variable(Node):
     
     def __init__(self,domain,observed = None,*args,**kwargs):
         super(Variable,self).__init__(type_ = "Variable",*args,**kwargs)
+        
         self.domain = set(domain)
         if observed is not None:
             self.set_as_observed(observed)
@@ -98,6 +102,7 @@ class Variable(Node):
 
         if message_type == "sum_prod":    
             norm_const = sum(evaluations.values())
+            if norm_const == 0: print evaluations
             for v in evaluations:
                 evaluations[v] = evaluations[v]*1./norm_const 
 
@@ -105,15 +110,20 @@ class Variable(Node):
         if self.observed is None:
             return evaluations
         else:
-            return {self.observed:evaluations[self.observed]}
+            return {self.observed:1.}
         #else:
          #   return max(,key = itemgetter(1))
-    
+
+    def unpack_messages(self):
+        for from_,f in self.received.iteritems():
+            print "\n\tFrom {}".format(from_)
+            for v in self.domain:            
+               print "\t"*2,v,f(v) 
     
     def compute(self,v):
         
         assert v in self.domain
-        
+
         if self.observed is not None:
             #print "Variable is observed with value {}".format([x for x in self.observed][0])
             return 1. if v == self.observed else 0.
@@ -122,7 +132,6 @@ class Variable(Node):
         if self.message_type == "sum_prod":
             norm_const = self.compute_norm_const()
             result = result*1./norm_const
-
         return result
 
     def compute_norm_const(self):
@@ -201,7 +210,10 @@ class Recurrent_Variable(Variable):
 
             if step not in self.to_send_steps:
                 continue
+
+            #skip
             if not init and len(self.to_send_steps[step]) < len(self.to_send_steps)-1:
+                #print "\t",step,self.current_step
                 continue
             to_step = step
             
@@ -220,12 +232,12 @@ class Recurrent_Variable(Variable):
                                        when = self.current_step,
                                        content = self.message_func(to_step,feed_dict,**kwargs))
 
-
-            self.transition_factor.receive(message_to)            
-            message_back = list(self.transition_factor.send(when = self.current_step)).pop()
+            #print "\t",message_to
+            self.transition_factor.receive(message_to,*args,**kwargs)            
+            message_back = list(self.transition_factor.send(when = self.current_step,show = True,**kwargs)).pop()
             assert message_back is not None
-            
 
+                        
             # go to next step
             next_step = self.current_step + (1 if to_step == "n" else -1)
             #print "{} goes from step {} to {}".format(self.name,self.current_step,next_step)
@@ -234,6 +246,12 @@ class Recurrent_Variable(Variable):
             
             #to_step,_,content = message_back
             message_back = message_back._asdict()
+
+            #print "Message from {} to {} at step {}".format(message_back["from_"],message_back["to"],self.current_step)
+            #for v in self.domain:
+             #   print v,message_back["content"](v)
+            #print
+            
             from_step = "p" if message_back["to"] == "n" else "n"
             self.received[from_step] = message_back['content']
             
@@ -241,6 +259,11 @@ class Recurrent_Variable(Variable):
                 if step != from_step and step in self.to_send_steps:
                     self.to_send_steps[step][from_step] = message_back["content"]
                     #self.to_send_steps[step].append((from_step,message_back['content']))
+
+            #send any messages from following step
+            list(self.send(*args,**kwargs))
+            #print self.current_step
+                
         
     def receive(self,message,*args,**kwargs):
         #assert message.when == self.current_step,(message.when,self.current_step,self.name)
@@ -248,22 +271,56 @@ class Recurrent_Variable(Variable):
         #to,from_,content = message
 
         message = message._asdict()
+
+        #print "Message from {} to {}".format(message["from_"],message["to"])
+        #for v in self.domain:
+         #   print v,message["content"](v)
         
         for step in ["n","p"]:
             if step in self.to_send_steps:
                 self.to_send_steps[step][message['from_']] = message["content"]
                 #self.to_send_steps[step].append((message['from_'],message['content']))
 
-'''
-class Observed_Variable(Variable):
-    def __init__(self,observations_list):
-        self.observations_list = observations_list
-        self.observations = iter(observations_list)
 
-    def message_func()
-'''              
+class Observed_Recurrent_Variable(Variable):
+    def __init__(self,observed_steps = [],*args,**kwargs):
+        super(Observed_Recurrent_Variable,self).__init__(*args,**kwargs)
+        self.set_as_observed(observed_steps)        
+    
+    def send(self,*args,**kwargs):
+        assert self.observed_steps,"Variable node did not recieve list of observations"
+        try:
+            self.observed = self.observations.next()
+        except StopIteration:
+            return
+
+        for message in super(Observed_Recurrent_Variable,self).send(*args,**kwargs):
+            yield message
+
+    def reset(self):
+        self.observations = iter(self.observed_steps)
+
+    def set_as_observed(self,observed_steps):
+        observed_steps = observed_steps if observed_steps is not None else []
+        if observed_steps:
+            assert all(obs in self.domain for obs in observed_steps),(observed_steps,self.domain)
+        self.observed_steps = observed_steps
+        self.reset()
+
+    
+              
 
 if __name__=="__main__":
+
+    node = Observed_Recurrent_Variable(name = "test",
+                                       #observed_steps = [1,0,0,1],
+                                       connections = ["factor"],
+                                       domain = [0,1],
+    )
+
+    node.set_observations([1,0,1,1,0,1,1,0])
+
+    '''
     node = Recurrent_Variable(name = "test",
                               n_steps = 3,
                               observed_steps = None,
@@ -272,6 +329,24 @@ if __name__=="__main__":
                               transition_func = None)
 
     node.set_as_observed([1,0,1])
+    '''
+
+    for i in range(150):
+        
+        
+        node.receive(message_tuple(to = "test",
+                                   from_ = "factor",
+                                   when = None,
+                                   content = lambda x:True)
+                     )
+        out  = list(node.send())
+        if out:
+            print out
+    exit()
+
+
+
+
     for i in range(5):
         
         print
@@ -289,6 +364,9 @@ if __name__=="__main__":
 
         print list(node.send())
     exit()
+
+
+        
     print node.steps[node.current_step]
     print
     
@@ -313,4 +391,3 @@ if __name__=="__main__":
     print node.to_send_steps
     print node.steps[node.current_step]
     print list(node.send())
-    

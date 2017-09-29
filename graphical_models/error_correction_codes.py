@@ -72,12 +72,21 @@ class Repeat_Code(Graph):
         )
         self.add_node(transmitted_bits,category = "Transmitted_bits")
 
+                
+        received_bits = Observed_Recurrent_Variable(name = "r",
+                                                    connections = ["likelihood"],
+                                                    domain = [0,1],
+        
+        )
+
+
+        '''
         received_bits = Recurrent_Variable(name = "r",
                                            n_steps = self.n_repeats,
                                            connections = ["likelihood"],
                                            domain = [0,1],
                                            observed_steps = None)
-
+        '''
         self.add_node(received_bits,category = "Received_bits")
         
         
@@ -284,8 +293,8 @@ if __name__=="__main__":
     
     repeat_code = Repeat_Code(n_repeats = 7,flip_prob = 0.1)
 
-    received_bits = [1,1,5,1,1,1,1]
-    repeat_code.decode(received_bits,limit = 100,message_type = "sum_prod",verbose = False)
+    received_bits = [0,1,0,1,1,0,1]
+    repeat_code.decode(received_bits,limit = 100,message_type = "sum_prod",verbose = True)
     #print reduce(lambda cum,x:cum*(0.9),received_bits,1)
     '''
     h_code = Hamming_Code(flip_prob=0.1)

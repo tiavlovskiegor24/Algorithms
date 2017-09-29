@@ -86,7 +86,7 @@ class Node(object):
             if not init:
                 self.sent_count += 1
 
-    def receive(self,message):
+    def receive(self,message,*args,**kwargs):
         '''method to receive message from a connection'''
         #to,from_,content = message
         message = message._asdict()
@@ -214,7 +214,8 @@ class Graph(object):
             to_node = self.nodes["all"][to]
             
             if verbose == True:
-                print "\nDelivering {}".format(message)
+                if to not in self.nodes["Variable"]:
+                    print "\nDelivering {}".format(message)
 
             to_node.receive(message)
             #if to not in self.leaves:
